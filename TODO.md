@@ -8,7 +8,7 @@
 - [ ] Day1 仓库初始化 Step 0：骨架 / .gitignore / compose 底座 / 空 CI / README（AI 已代办，待你验收）
 - [ ] Day1 补课层0：撞墙实验 A/B/C，能讲清"软墙 vs 硬墙"
 - [ ] Day2 docker 起 Conductor，localhost:5000 UI 可用，逛熟 Executions 页
-- [ ] Day2 补课层1：DeepSeek 充值，裸调 chat API，看懂 messages 结构
+- [ ] Day2 补课层1：DeepSeek 充值✅（余额 57.61 元，key 已存 .env），裸调 chat API，看懂 messages 结构
 - [ ] Day2 补课层2：50 行最小工具调用循环（query_weather）
 - [ ] Day3 跑通 aideepin；精读 RAG + MCP 模块，笔记存 private/notes/
 - [ ] Day3 补课层3：配 filesystem MCP server；读 modelcontextprotocol.io Introduction
