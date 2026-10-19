@@ -48,3 +48,12 @@ W1 验收：Conductor UI（localhost:5000）Executions 页能看到每个节点�
 | ticket_create | `(title: String, content: String) → ticketId` | 写（经人审） | 工单创建 |
 
 签名随实现修订；每次改动同步更新本节。
+
+### 1.4 worker 模块与 Conductor 连接（W1 Day2 落地）
+
+- 模块：`workers/`（Spring Boot 3.5.16 + `org.conductoross:conductor-client:6.0.2`，Java 21，非 web 起步）
+- worker 写法：官方 SDK 注解式——`@WorkerTask("任务名")` + `@InputParam`/`@OutputParam`（见 `EchoTasks`）；启动时 `WorkflowExecutor(conductorApi).initWorkersFromInstances(...)` 注册并开始轮询
+- 连接地址：`gateflow.conductor-api`（`workers/src/main/resources/application.yml`，默认 `http://localhost:8080/api`）
+- workflow 定义：`deploy/workflows/*.json`，注册 `PUT /api/metadata/workflow`，触发 `POST /api/workflow/{name}`；执行详情 `GET /api/workflow/{id}`（此版本无 `/status` 子路径）
+- Day2 切片：`gateflow_demo` = 单任务 `echo_demo`，已跑通 COMPLETED（execution: 输入输出在 UI Executions 页可见）；后续节点按同模式原位扩展
+- 踩坑记录：① conductor 容器偶发端口代理失效（8080 未监听），`docker compose up -d --force-recreate conductor` 解决；② Windows 命令行发中文 JSON 会被 GBK 编码搞坏，请求体一律写 UTF-8 文件再 `--data @file`

@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: gateflow-workers
+
+gateflow:
+  # Conductor 引擎的 API 地址（docker-compose 里的 conductor 容器）
+  conductor-api: http://localhost:8080/api

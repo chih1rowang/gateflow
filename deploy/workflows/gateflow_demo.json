@@ -1,0 +1,22 @@
+[
+  {
+    "name": "gateflow_demo",
+    "description": "W1 Day2 first slice: single echo task (will grow into rag_retriever -> llm_answer -> echo)",
+    "version": 1,
+    "schemaVersion": 2,
+    "restartable": true,
+    "tasks": [
+      {
+        "name": "echo_demo",
+        "taskReferenceName": "echo_ref",
+        "inputParameters": {
+          "text": "${workflow.input.text}"
+        },
+        "type": "SIMPLE"
+      }
+    ],
+    "outputParameters": {
+      "echoed": "${echo_ref.output.echoed}"
+    }
+  }
+]
