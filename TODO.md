@@ -13,8 +13,8 @@
 - [ ] Day3 跑通 aideepin；精读 RAG + MCP 模块，笔记存 private/notes/
 - [ ] Day3 补课层3：配 filesystem MCP server；读 modelcontextprotocol.io Introduction
 - [x] Day3 llm_answer worker：LangChain4j 1.22.0 → DeepSeek（deepseek-chat），workflow v2 两步链 llm_answer→echo 跑通（2026-10-19，AI 代跑 2588ms/740字，中文完好）
-- [ ] Day4 风险 spike：真实 MCP 客户端连 Spring AI MCP 端点 hello-world（首选 Cursor，已装的 Trae CN 兜底；纯技术验证用 MCP Inspector + curl。不用 Claude Code——封号风险）（结论记入 design.md）
-- [ ] Day5 第一条 workflow：rag_retriever → llm_answer → echo 跑通
+- [x] Day4 风险 spike ✅（2026-10-19）：Spring AI 2.0.1 MCP 端点验证通过（initialize→tools/list→tools/call 全链，hello 工具被远程调用）。结论+踩坑已入 design.md §1.4。gateway 骨架上线 8090 端口。注解坑：2.0 包路径 org.springframework.ai.mcp.annotation，@McpToolParam 无 name 属性
+- [x] Day5 rag_retriever ✅（2026-10-19）：4 份报销制度文档入库（本地 BGE-small-zh，ONNX 免费）+ LlmTasks 升级 RAG 版（system 携带片段+限定出处）+ workflow v3 三步链跑通。验收实录：500元上限问题答对且带引用（3 chunks, top 0.8571）——**W1 验收④达成**
 - [ ] Day6 W1 验收五项：①:5000 UI ②execution 节点可见 ③repo 已 push ④RAG→LLM 回答原文 ⑤spike 结论
 - [ ] Day6 场景已定：社团经费报销（AI 代定；演示文档由 AI 生成，之后可随时换真实资料）；第一层话术据此定稿
 - [ ] Day7 W1《面试问答卡》+ 15 分钟模拟追问

@@ -19,17 +19,20 @@ public class WorkerRegistration implements CommandLineRunner {
 
     private final String conductorApi;
     private final LlmTasks llmTasks;
+    private final RagTasks ragTasks;
 
     public WorkerRegistration(@Value("${gateflow.conductor-api}") String conductorApi,
-                              LlmTasks llmTasks) {
+                              LlmTasks llmTasks,
+                              RagTasks ragTasks) {
         this.conductorApi = conductorApi;
         this.llmTasks = llmTasks;
+        this.ragTasks = ragTasks;
     }
 
     @Override
     public void run(String... args) {
         WorkflowExecutor executor = new WorkflowExecutor(conductorApi);
-        executor.initWorkersFromInstances(List.of(new EchoTasks(), llmTasks));
-        log.info("GateFlow workers online (echo_demo, llm_answer), polling tasks from {}", conductorApi);
+        executor.initWorkersFromInstances(List.of(new EchoTasks(), llmTasks, ragTasks));
+        log.info("GateFlow workers online (echo_demo, llm_answer, rag_retriever), polling tasks from {}", conductorApi);
     }
 }

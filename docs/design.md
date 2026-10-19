@@ -29,17 +29,25 @@ Conductor（docker，引擎现成）◄──注册── workers（langchain4j 
 
 仓库结构映射：`gateway/`（W3）· `workers/`（W1 起主战场）· `panel/`（W5）· `deploy/`（compose/nginx/压测）。
 
-### 1.2 第一条 workflow：rag_retriever → llm_answer → echo
-
-当前实况（Day3 后）：v2 已上线 = `llm_answer → echo` 两步链真实跑通；`rag_retriever` 待 W1 后半补入最前端。
+### 1.2 第一条 workflow：rag_retriever → llm_answer → echo（W1 定稿形态，v3 已跑通）
 
 | 节点 | 类型 | 输入 | 输出 | 实现 |
 |---|---|---|---|---|
-| rag_retriever | simple | `question: String` | `chunks: List<String>` | 待实现：langchain4j easy-rag + 本地 BGE 中文向量模型，TopK 待定（W4 评测调优） |
-| llm_answer | simple | `question` | `answer: String` | ✅ 已实现：langchain4j-open-ai（OpenAI 兼容接口指向 DeepSeek baseUrl，模型 deepseek-chat） |
-| echo | simple | `answer` | `answer` | ✅ 已实现：链路占位节点（W2 由人工审核节点替换） |
+| rag_retriever | simple | `question` | `chunks: List<String>` | ✅ 本地 BGE-small-zh-v15（ONNX in-process，免费离线）+ InMemoryEmbeddingStore；启动时入库（recursive 切分 300/30），检索 TopK=3（W4 评测调优） |
+| llm_answer | simple | `question`、`chunks` | `answer` | ✅ system 消息携带制度片段（限定只依据资料回答+注明出处）+ user 消息携带问题 |
+| echo | simple | `answer` | `answer` | ✅ 链路终端节点（W2 由人工审核节点替换） |
 
-W1 验收：Conductor UI（localhost:5000）Executions 页能看到每个节点的输入输出；llm_answer 的输出是基于自己文档生成的真实回答原文（待 rag_retriever 就位后达成"基于文档"）。
+知识库：`deploy/knowledge/*.md`（4 份社团经费制度文档，含独有数字如 500 元上限——保证"答对=检索到了"可验证）。
+W1 验收实录：问"单笔报销上限是多少？超过怎么办" → 回答含 500 元、超额预批流程、引用《报销制度》第 1 条；检索 3 片段 top score 0.8571。
+
+### 1.6 RAG 实现要点（W1 Day5 落地）
+
+- 依赖：`langchain4j-easy-rag` + `langchain4j-embeddings-bge-small-zh-v15`（1.22.0-beta32 线）
+- 启动入库（一次性）：FileSystemDocumentLoader 加载 → DocumentSplitters.recursive(300, 30) 切分 → BGE 向量化 → InMemoryEmbeddingStore
+- 检索（每次任务）：question 向量化 → store.search(maxResults=3) → 片段文本列表
+- BGE 类路径：`dev.langchain4j.model.embedding.onnx.bgesmallzhv15.BgeSmallZhV15EmbeddingModel`（jar 内 ONNX 模型随包分发，进程内推理）
+- LLM 消息构造：`model.chat(List.of(SystemMessage, UserMessage)).aiMessage().text()`——chat(List) 重载返回 ChatResponse
+- 内存库局限（诚实边界）：重启进程需重新入库（约 5 秒，4 文档规模无感）；文档量大后换持久化向量库；TopK 与切分参数未调优——W4 用评测集做（钩子 5 的演进素材）
 
 ### 1.3 工具签名草案（W3 网关注册的三个工具）
 

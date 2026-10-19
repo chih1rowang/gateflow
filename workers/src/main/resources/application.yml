@@ -12,3 +12,8 @@ gateflow:
     base-url: https://api.deepseek.com
     model-name: deepseek-chat
     api-key: ${DEEPSEEK_API_KEY}
+  rag:
+    # 制度文档库（相对于仓库根目录启动；IDEA 里运行请把工作目录设为仓库根）
+    docs-path: ./deploy/knowledge
+    # 每次检索返回的最相关片段数（W4 将用评测集调优此值）
+    max-results: 3

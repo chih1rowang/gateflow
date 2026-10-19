@@ -21,6 +21,7 @@
     <java.version>21</java.version>
     <conductor.version>6.0.2</conductor.version>
     <langchain4j.version>1.22.0</langchain4j.version>
+    <langchain4j-beta.version>1.22.0-beta32</langchain4j-beta.version>
   </properties>
 
   <dependencies>
@@ -39,6 +40,17 @@
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-open-ai</artifactId>
       <version>${langchain4j.version}</version>
+    </dependency>
+    <!-- RAG：文档加载/切分便捷层 + 本地 in-process 中文向量模型（BGE-small-zh，ONNX 运行，免费离线） -->
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-easy-rag</artifactId>
+      <version>${langchain4j-beta.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-embeddings-bge-small-zh-v15</artifactId>
+      <version>${langchain4j-beta.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

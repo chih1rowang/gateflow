@@ -1,16 +1,25 @@
 [
   {
     "name": "gateflow_demo",
-    "description": "W1 Day3: question -> llm_answer (DeepSeek) -> echo (day5 will prepend rag_retriever)",
-    "version": 2,
+    "description": "W1 final: rag_retriever -> llm_answer -> echo (full RAG pipeline)",
+    "version": 3,
     "schemaVersion": 2,
     "restartable": true,
     "tasks": [
       {
+        "name": "rag_retriever",
+        "taskReferenceName": "rag_ref",
+        "inputParameters": {
+          "question": "${workflow.input.question}"
+        },
+        "type": "SIMPLE"
+      },
+      {
         "name": "llm_answer",
         "taskReferenceName": "llm_ref",
         "inputParameters": {
-          "question": "${workflow.input.question}"
+          "question": "${workflow.input.question}",
+          "chunks": "${rag_ref.output.chunks}"
         },
         "type": "SIMPLE"
       },
