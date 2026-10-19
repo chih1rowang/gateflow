@@ -12,7 +12,7 @@
 - [ ] Day2 补课层2：50 行最小工具调用循环（query_weather）
 - [ ] Day3 跑通 aideepin；精读 RAG + MCP 模块，笔记存 private/notes/
 - [ ] Day3 补课层3：配 filesystem MCP server；读 modelcontextprotocol.io Introduction
-- [ ] Day4 风险 spike：Claude Code 连 Spring AI MCP 端点 hello-world（结论记入 design.md）
+- [ ] Day4 风险 spike：真实 MCP 客户端连 Spring AI MCP 端点 hello-world（首选 Cursor，已装的 Trae CN 兜底；纯技术验证用 MCP Inspector + curl。不用 Claude Code——封号风险）（结论记入 design.md）
 - [ ] Day5 第一条 workflow：rag_retriever → llm_answer → echo 跑通
 - [ ] Day6 W1 验收五项：①:5000 UI ②execution 节点可见 ③repo 已 push ④RAG→LLM 回答原文 ⑤spike 结论
 - [ ] Day6 场景已定：社团经费报销（AI 代定；演示文档由 AI 生成，之后可随时换真实资料）；第一层话术据此定稿

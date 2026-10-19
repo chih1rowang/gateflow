@@ -9,7 +9,7 @@
 ### 1.1 模块图
 
 ```
-Claude Code / Cursor / 自研问答页
+任意 MCP 客户端（Cursor / Trae CN / 自研问答页；开发验证用 MCP Inspector + curl）
         │  MCP (Streamable HTTP, JSON-RPC)
         ▼
 ┌─────────────────────────────┐
