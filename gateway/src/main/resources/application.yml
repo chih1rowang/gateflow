@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: gateflow-gateway
+  ai:
+    mcp:
+      server:
+        name: gateflow-gateway
+        # Streamable HTTP 传输（SSE 传输自 Spring AI 2.0 起废弃——本身就是一道八股）
+        protocol: STREAMABLE
+
+server:
+  port: 8090

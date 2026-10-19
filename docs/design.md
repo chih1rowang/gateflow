@@ -51,7 +51,31 @@ W1 验收：Conductor UI（localhost:5000）Executions 页能看到每个节点�
 
 签名随实现修订；每次改动同步更新本节。
 
-### 1.4 worker 模块与 Conductor 连接（W1 Day2 落地）
+### 1.4 W1 Day4 风险 spike 结论：Spring AI MCP 端点 ✅ 能连（2026-10-19）
+
+**结论：能连。** 全项目最大技术风险（W3 网关的前提）解除。验证实录（curl 模拟 MCP 客户端，全程可复现）：
+
+| 步骤 | 请求 | 结果 |
+|---|---|---|
+| initialize | POST /mcp（protocolVersion 2025-06-18） | 返回 serverInfo=gateflow-gateway + `Mcp-Session-Id` 响应头 |
+| notifications/initialized | 带 Session-Id | 204（协议要求，无响应体） |
+| tools/list | 带 Session-Id | hello 工具完整呈现：描述 + 自动生成的 JSON Schema（参数 name/string/required） |
+| tools/call hello | arguments={"name":"GateFlow"} | `"hello GateFlow from gateflow-gateway"`——Java 方法被 MCP 协议远程执行 |
+
+**关键观察**：
+1. 传输层为 Streamable HTTP：单一 `/mcp` 端点，POST 请求；响应在客户端 Accept 时以 SSE 格式（`event:message` + `data:{...}`）回流——SSE 自 2.0 起从"独立传输"降级为"流式应答格式"（八股点）
+2. 会话有状态：initialize 签发 `Mcp-Session-Id`，后续请求必须携带——W3 的 JWT 过滤器与此 Session-Id 是两个层面（认证 vs 协议会话），注意区分
+3. **端点默认无鉴权**：以上全部请求未携带任何凭证，直接成功——官方文档警告实测属实，W3 JWT 过滤器的必要性实锤
+4. 踩坑记录：Spring AI 2.0.1 的注解在 `org.springframework.ai.mcp.annotation` 包（非 1.x 的 tool.annotation）；`@McpToolParam` 无 name 属性，参数名取自方法形参名（依赖 -parameters 编译参数，Spring Boot parent 默认开启）
+
+**对策（原风险预案作废）**：无需备用方案，W3 直接在此骨架上叠加 JWT/限流/审计。
+
+**给学生的真实客户端配置**（Cursor / Trae 通用）：
+```json
+{ "mcpServers": { "gateflow": { "url": "http://localhost:8090/mcp" } } }
+```
+
+### 1.5 worker 模块与 Conductor 连接（W1 Day2 落地）
 
 - 模块：`workers/`（Spring Boot 3.5.16 + `org.conductoross:conductor-client:6.0.2`，Java 21，非 web 起步）
 - worker 写法：官方 SDK 注解式——`@WorkerTask("任务名")` + `@InputParam`/`@OutputParam`（见 `EchoTasks`）；启动时 `WorkflowExecutor(conductorApi).initWorkersFromInstances(...)` 注册并开始轮询
