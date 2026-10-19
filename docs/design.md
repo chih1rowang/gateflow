@@ -31,13 +31,15 @@ Conductor（docker，引擎现成）◄──注册── workers（langchain4j 
 
 ### 1.2 第一条 workflow：rag_retriever → llm_answer → echo
 
+当前实况（Day3 后）：v2 已上线 = `llm_answer → echo` 两步链真实跑通；`rag_retriever` 待 W1 后半补入最前端。
+
 | 节点 | 类型 | 输入 | 输出 | 实现 |
 |---|---|---|---|---|
-| rag_retriever | simple | `question: String` | `chunks: List<String>` | langchain4j easy-rag + 本地 in-process BGE 中文向量模型（免费），TopK 待定（W4 评测调优） |
-| llm_answer | simple | `question`、`chunks` | `answer: String` | langchain4j-open-ai 配 DeepSeek baseUrl，回答需附来源 |
-| echo | simple | `answer` | `answer` | 打通链路的占位节点（人审节点 W2 替换它） |
+| rag_retriever | simple | `question: String` | `chunks: List<String>` | 待实现：langchain4j easy-rag + 本地 BGE 中文向量模型，TopK 待定（W4 评测调优） |
+| llm_answer | simple | `question` | `answer: String` | ✅ 已实现：langchain4j-open-ai（OpenAI 兼容接口指向 DeepSeek baseUrl，模型 deepseek-chat） |
+| echo | simple | `answer` | `answer` | ✅ 已实现：链路占位节点（W2 由人工审核节点替换） |
 
-W1 验收：Conductor UI（localhost:5000）Executions 页能看到每个节点的输入输出；llm_answer 的输出是基于自己文档生成的真实回答原文。
+W1 验收：Conductor UI（localhost:5000）Executions 页能看到每个节点的输入输出；llm_answer 的输出是基于自己文档生成的真实回答原文（待 rag_retriever 就位后达成"基于文档"）。
 
 ### 1.3 工具签名草案（W3 网关注册的三个工具）
 

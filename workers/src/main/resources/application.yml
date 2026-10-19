@@ -1,7 +1,14 @@
 spring:
   application:
     name: gateflow-workers
+  # 从仓库根目录的 .env 读取密钥（KEY=VALUE 格式按 properties 解析；两个路径覆盖"从根目录/从模块目录启动"两种情况）
+  config:
+    import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
 
 gateflow:
   # Conductor 引擎的 API 地址（docker-compose 里的 conductor 容器）
   conductor-api: http://localhost:8080/api
+  deepseek:
+    base-url: https://api.deepseek.com
+    model-name: deepseek-chat
+    api-key: ${DEEPSEEK_API_KEY}

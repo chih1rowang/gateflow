@@ -12,6 +12,7 @@
 - [x] Day2 补课层2：取消独立实验（学生决定），并入 Day3 llm_answer worker 边写边讲
 - [ ] Day3 跑通 aideepin；精读 RAG + MCP 模块，笔记存 private/notes/
 - [ ] Day3 补课层3：配 filesystem MCP server；读 modelcontextprotocol.io Introduction
+- [x] Day3 llm_answer worker：LangChain4j 1.22.0 → DeepSeek（deepseek-chat），workflow v2 两步链 llm_answer→echo 跑通（2026-10-19，AI 代跑 2588ms/740字，中文完好）
 - [ ] Day4 风险 spike：真实 MCP 客户端连 Spring AI MCP 端点 hello-world（首选 Cursor，已装的 Trae CN 兜底；纯技术验证用 MCP Inspector + curl。不用 Claude Code——封号风险）（结论记入 design.md）
 - [ ] Day5 第一条 workflow：rag_retriever → llm_answer → echo 跑通
 - [ ] Day6 W1 验收五项：①:5000 UI ②execution 节点可见 ③repo 已 push ④RAG→LLM 回答原文 ⑤spike 结论

@@ -1,22 +1,30 @@
 [
   {
     "name": "gateflow_demo",
-    "description": "W1 Day2 first slice: single echo task (will grow into rag_retriever -> llm_answer -> echo)",
-    "version": 1,
+    "description": "W1 Day3: question -> llm_answer (DeepSeek) -> echo (day5 will prepend rag_retriever)",
+    "version": 2,
     "schemaVersion": 2,
     "restartable": true,
     "tasks": [
       {
+        "name": "llm_answer",
+        "taskReferenceName": "llm_ref",
+        "inputParameters": {
+          "question": "${workflow.input.question}"
+        },
+        "type": "SIMPLE"
+      },
+      {
         "name": "echo_demo",
         "taskReferenceName": "echo_ref",
         "inputParameters": {
-          "text": "${workflow.input.text}"
+          "text": "${llm_ref.output.answer}"
         },
         "type": "SIMPLE"
       }
     ],
     "outputParameters": {
-      "echoed": "${echo_ref.output.echoed}"
+      "answer": "${echo_ref.output.echoed}"
     }
   }
 ]
