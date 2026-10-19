@@ -1,0 +1,15 @@
+# 占位 CI：模块就绪后接入真实构建（W1 验收只要求流水线存在且绿）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder (build wired when gateway/workers modules land)
+        run: echo "GateFlow CI placeholder - mvn verify will be wired in W1/W2"

@@ -1,0 +1,48 @@
+# GateFlow 基础设施底座（W1：Conductor + MySQL + Redis）
+# W4 扩展为 7 服务全家桶（+Kafka +Zookeeper/KRaft +gateway +worker +panel +nginx）
+# 启动：docker compose up -d
+
+name: gateflow
+
+services:
+  # 编排引擎：UI=5000，API=8080
+  # W1 用默认配置（引擎自带持久化机制，红线：不深入研究引擎内部）
+  conductor:
+    image: conductoross/conductor:next
+    container_name: gateflow-conductor
+    ports:
+      - "5000:5000"
+      - "8080:8080"
+    restart: unless-stopped
+
+  # 应用数据库（审计表/业务表）
+  # 注意：宿主机 3306 已被本地 MySQL 服务占用，故映射 3307
+  mysql:
+    image: mysql:8.4
+    container_name: gateflow-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: gateflow_dev_123
+      MYSQL_DATABASE: gateflow
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+
+  # 限流 + 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: gateflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:

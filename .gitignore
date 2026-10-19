@@ -1,0 +1,42 @@
+# ===== 保密红线：战略文档永远不进公开仓库 =====
+private/
+
+# ===== Java =====
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+.pnpm-store/
+
+# ===== 环境与密钥（不入库）=====
+.env
+.env.*
+*.local
+application-local.yml
+
+# ===== 日志 =====
+logs/
+*.log
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 测试报告（体积大者不入库，README 摘要即可）=====
+*.jtl
