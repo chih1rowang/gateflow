@@ -22,6 +22,7 @@
     <conductor.version>6.0.2</conductor.version>
     <langchain4j.version>1.22.0</langchain4j.version>
     <langchain4j-beta.version>1.22.0-beta32</langchain4j-beta.version>
+    <mybatis-plus.version>3.5.17</mybatis-plus.version>
   </properties>
 
   <dependencies>
@@ -56,6 +57,22 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
+    </dependency>
+    <!-- W2：HTTP 能力（SSE 流式问答 + admin 端点） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- W2：MySQL 访问（ORM：MyBatis-Plus；只读查询用 JdbcTemplate） -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+      <version>${mybatis-plus.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 

@@ -107,3 +107,22 @@ rag_retriever → llm_answer → human_review(HUMAN) → echo(终态回显)
 
 预期行为（已实测验证，2026-10-21）：触发后流程停在 human_review（workflow RUNNING、该 task IN_PROGRESS，可无限期等待——状态在引擎库）；审批走 **`POST /api/tasks`**，体为 `{taskId, workflowInstanceId, status:"COMPLETED", outputData:{decision, comment}}`（PUT /api/tasks/{id} 不支持，实测 500）；写完引擎立即续跑。执行实录 7a38edd1：rag→llm 完成、HUMAN 挂起、批准后 echo 完成，最终输出携带审批结论。
 W2 验收映射：①停在人工节点/批准走完 ✅D1（落库部分 D2-3 补）②SSE 逐 chunk（D4）③kill -9 恢复（D2-3）。
+
+### 2.2 W2 终态（2026-10-21 收官，三项验收全过）
+
+**新增工位**：db_query（JdbcTemplate，仅放行单条 SELECT）/ persist_draft（MyBatis-Plus，workflow_id 唯一键幂等）/ ticket_create（标题查重复用）。数据源：gateflow-mysql(3307)，表见 deploy/sql/init.sql。
+
+**SWITCH 系统任务（踩坑实录）**：value-param 评估器的 expression 必须填**输入参数名**（如 "decision"），并在 inputParameters 里用 ${} 取值；直接写 "${review_ref.output.decision}" 会静默走 defaultCase。两条路径实测：APPROVED→persist+ticket 落库；REJECTED→不写库。
+
+**任务超时与重试（内嵌 taskDefinition）**：llm_answer 嵌入 retryCount=2 / timeoutSeconds=120 / responseTimeoutSeconds=30 / TIME_OUT_WF。元数据 taskdef API 在 conductor:next 未找到可用路径，内嵌方式实测有效。
+
+**kill -9 两阶段实验（W2 验收③）**：
+- 阶段一：worker 先死→触发→rag SCHEDULED（队列等待）→重启 worker→领取执行→HUMAN→批准→落库（record_id=2）✅
+- 阶段二：llm 执行中杀进程→孤儿任务 IN_PROGRESS→120s 准时 TIMED_OUT（TIME_OUT_WF）→POST /api/workflow/{id}/retry→**rag 单实例不重执行（输出重放）、llm 双实例（一次 TIMED_OUT + 一次 COMPLETED，LLM 真实被调两次）**→HUMAN ✅。at-least-once 与重放语义的执行级证据。
+- 未观察到：响应超时自动重派（responseTimeoutSeconds=30 嵌入后 2 分钟内未见孤儿自动回队列）——引擎 sweeper 行为，红线内不深究，生产对策=任务定义超时+retry 接口/外部监控。
+
+**SSE（验收②）**：GET /stream/ask?q=...（8081）→RAG 检索→DeepSeek 流式生成逐块推送。实测 143 chunks/1.35s，Content-Type=text/event-stream，末尾 event:done。实现：SseEmitter + OpenAiStreamingChatModel 三回调（onPartialResponse/onCompleteResponse/onError），每请求一线程（朴素实现，W4 换线程池——对应线程池八股）。
+
+**知识库热重载**：POST /admin/knowledge/reload → volatile 换库（RagTasks.reload）。实测：新增场地预约制度.md→reload(5 docs)→仅新文档可答的问题正确回答并带出处。
+
+**编码方法论（终版，替代 Day2 版）**：①命令行内联中文进 curl 参数=绝对禁止（服务端拒收）；②中文请求体必经 UTF-8 文件（Write 工具最稳）；③验证数据真身用 HEX/码点（unicode_escape），终端显示不可信（本会话显示层全程 GBK，数据实为干净 UTF-8）。

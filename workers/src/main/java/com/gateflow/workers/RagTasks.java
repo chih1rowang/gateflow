@@ -36,26 +36,41 @@ public class RagTasks {
     private static final Logger log = LoggerFactory.getLogger(RagTasks.class);
 
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> store;
+    // volatile：reload() 重建后整体替换引用，进行中的检索读旧库、新检索读新库，不阻塞互不撕裂
+    private volatile EmbeddingStore<TextSegment> store;
     private final int maxResults;
+    private final String docsPath;
 
     public RagTasks(@Value("${gateflow.rag.docs-path}") String docsPath,
                     @Value("${gateflow.rag.max-results}") int maxResults) {
         this.maxResults = maxResults;
+        this.docsPath = docsPath;
         // in-process 模型：ONNX 推理在本进程内运行，不联网、不收费
         this.embeddingModel = new BgeSmallZhV15EmbeddingModel();
-        this.store = new InMemoryEmbeddingStore<>();
+        this.store = buildStore();
+        log.info("RAG store ready from {}", docsPath);
+    }
 
+    /** 重建向量库并原子替换（admin 端点调用；换语料免重启） */
+    public synchronized int reload() {
+        this.store = buildStore();
+        List<Document> documents = FileSystemDocumentLoader.loadDocuments(docsPath);
+        log.info("RAG store reloaded: {} documents from {}", documents.size(), docsPath);
+        return documents.size();
+    }
+
+    private EmbeddingStore<TextSegment> buildStore() {
+        EmbeddingStore<TextSegment> newStore = new InMemoryEmbeddingStore<>();
         // 入库管道：切分（每片约 300 token、重叠 30）→ 向量化 → 存库
         DocumentSplitter splitter = DocumentSplitters.recursive(300, 30);
         EmbeddingStoreIngestor ingestor = EmbeddingStoreIngestor.builder()
                 .documentSplitter(splitter)
                 .embeddingModel(embeddingModel)
-                .embeddingStore(store)
+                .embeddingStore(newStore)
                 .build();
         List<Document> documents = FileSystemDocumentLoader.loadDocuments(docsPath);
         ingestor.ingest(documents);
-        log.info("RAG store ready: {} documents ingested from {}", documents.size(), docsPath);
+        return newStore;
     }
 
     @WorkerTask("rag_retriever")

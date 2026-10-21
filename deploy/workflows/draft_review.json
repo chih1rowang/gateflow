@@ -1,8 +1,8 @@
 [
   {
     "name": "draft_review",
-    "description": "W2: RAG-drafted answer goes through human approval gate before finishing",
-    "version": 1,
+    "description": "W2 final: RAG draft -> human approval -> APPROVED: persist+ticket / REJECTED: no write",
+    "version": 2,
     "schemaVersion": 2,
     "restartable": true,
     "tasks": [
@@ -21,7 +21,16 @@
           "question": "${workflow.input.question}",
           "chunks": "${rag_ref.output.chunks}"
         },
-        "type": "SIMPLE"
+        "type": "SIMPLE",
+        "taskDefinition": {
+          "name": "llm_answer",
+          "retryCount": 2,
+          "timeoutSeconds": 120,
+          "responseTimeoutSeconds": 30,
+          "timeoutPolicy": "TIME_OUT_WF",
+          "retryLogic": "FIXED",
+          "retryDelaySeconds": 5
+        }
       },
       {
         "name": "human_review",
@@ -33,16 +42,65 @@
         "type": "HUMAN"
       },
       {
-        "name": "echo_demo",
-        "taskReferenceName": "echo_ref",
+        "name": "decision_switch",
+        "taskReferenceName": "switch_ref",
+        "type": "SWITCH",
+        "evaluatorType": "value-param",
+        "expression": "decision",
         "inputParameters": {
-          "text": "审核结论：${review_ref.output.decision}（${review_ref.output.comment}）"
+          "decision": "${review_ref.output.decision}"
         },
-        "type": "SIMPLE"
+        "decisionCases": {
+          "APPROVED": [
+            {
+              "name": "persist_draft",
+              "taskReferenceName": "save_ref",
+              "inputParameters": {
+                "workflowId": "${workflow.workflowId}",
+                "question": "${workflow.input.question}",
+                "draft": "${llm_ref.output.answer}",
+                "comment": "${review_ref.output.comment}"
+              },
+              "type": "SIMPLE"
+            },
+            {
+              "name": "ticket_create",
+              "taskReferenceName": "ticket_ref",
+              "inputParameters": {
+                "title": "[报销申请] ${workflow.input.question}",
+                "content": "${llm_ref.output.answer}"
+              },
+              "type": "SIMPLE"
+            }
+          ],
+          "REJECTED": [
+            {
+              "name": "echo_demo",
+              "taskReferenceName": "rej_ref",
+              "inputParameters": {
+                "text": "草稿已驳回：${review_ref.output.comment}"
+              },
+              "type": "SIMPLE"
+            }
+          ]
+        },
+        "defaultCase": [
+          {
+            "name": "echo_demo",
+            "taskReferenceName": "def_ref",
+            "inputParameters": {
+              "text": "未知审批结果，默认不落库"
+            },
+            "type": "SIMPLE"
+          }
+        ]
       }
     ],
     "outputParameters": {
-      "final": "${echo_ref.output.echoed}"
+      "decision": "${review_ref.output.decision}",
+      "comment": "${review_ref.output.comment}",
+      "record_id": "${save_ref.output.recordId}",
+      "ticket_id": "${ticket_ref.output.ticketId}"
     }
   }
 ]

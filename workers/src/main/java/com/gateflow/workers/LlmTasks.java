@@ -23,7 +23,8 @@ public class LlmTasks {
 
     private static final Logger log = LoggerFactory.getLogger(LlmTasks.class);
 
-    private static final String SYSTEM_PROMPT = """
+    /** RAG 受限生成的 system 模板（StreamController 复用） */
+    public static final String SYSTEM_PROMPT = """
             你是社团经费报销制度助手。请仅根据下面提供的【制度资料】回答问题；
             资料中没有依据时，明确回答"制度资料中未规定"，不得编造。
             回答末尾注明依据来自哪份资料。制度资料如下：

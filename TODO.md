@@ -22,6 +22,10 @@
 ## W2（10/26–11/1）切片：+ 人工审核节点 + 断点恢复
 
 - [x] W2D1 ✅（2026-10-21 提前开工）：draft_review 工作流（rag→llm→HUMAN→echo）实测通过——停在人工节点、POST /api/tasks 批准后走完，审批结论流入最终输出（执行 7a38edd1）。**W2 验收①主体达成**（落库 D2-3 补）
+- [x] W2D2-3 ✅（2026-10-21）：三表+种子数据（init.sql）；db_query/persist_draft/ticket_create 三工位上线；SWITCH 分支（批准→落库+工单 / 驳回→不写库，value-param 的 expression=参数名的坑已踩平）；批准路径落库实测（record_id/ticket_id 真实入库）
+- [x] W2D4 ✅（2026-10-21）：SSE 流式问答 /stream/ask（143 chunks/1.35s 实测）+ admin 知识库热重载端点（新增文档即问即答实测）
+- [x] kill -9 实验 ✅（2026-10-21）：阶段一（worker 死→队列等待→重启领活→批准落库）；阶段二（执行中杀→120s TIMED_OUT→retry 断点重跑，rag 重放不重执行 / llm 双实例 at-least-once 铁证）——**W2 验收③达成**
+- [x] W2 面试问答卡 → 已转为《八股-编排与幂等.md》题册（2026-10-21）
 
 - [ ] 三个 worker：文档检索 / 数据库只读查询 / 工单操作
 - [ ] human task：workflow 停在人工节点，批准后走完落库

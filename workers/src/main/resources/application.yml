@@ -4,6 +4,16 @@ spring:
   # 从仓库根目录的 .env 读取密钥（KEY=VALUE 格式按 properties 解析；两个路径覆盖"从根目录/从模块目录启动"两种情况）
   config:
     import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
+  datasource:
+    # gateflow-mysql 容器（宿主机 3307；本机 3306 被系统 MySQL 占用）
+    url: jdbc:mysql://localhost:3307/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: gateflow_dev_123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+server:
+  # workers 的 HTTP 能力（W2）：SSE 流式问答 + admin 端点。8080 被 Conductor 占用、8090 是 gateway
+  port: 8081
 
 gateflow:
   # Conductor 引擎的 API 地址（docker-compose 里的 conductor 容器）
