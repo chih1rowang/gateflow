@@ -66,6 +66,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-redis</artifactId>
     </dependency>
+    <!-- W4：审计异步化（Kafka） -->
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
     <!-- W3：审计落库 -->
     <dependency>
       <groupId>com.baomidou</groupId>

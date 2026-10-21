@@ -27,10 +27,10 @@ public class AuditFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AuditFilter.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AuditLogMapper auditLogMapper;
+    private final AuditWriter auditWriter;
 
-    public AuditFilter(AuditLogMapper auditLogMapper) {
-        this.auditLogMapper = auditLogMapper;
+    public AuditFilter(AuditWriter auditWriter) {
+        this.auditWriter = auditWriter;
     }
 
     @Override
@@ -76,7 +76,7 @@ public class AuditFilter extends OncePerRequestFilter {
                     row.setParamsSnippet(params.length() > 500 ? params.substring(0, 500) : params);
                 }
             }
-            auditLogMapper.insert(row);
+            auditWriter.write(row);
         } catch (Exception e) {
             // 审计失败不阻断主链路（本过滤器已在 finally 中）；W4 交由 Kafka 解耦后天然隔离
             log.error("audit write failed: {}", e.getMessage());

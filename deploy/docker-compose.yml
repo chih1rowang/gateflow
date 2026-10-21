@@ -1,12 +1,11 @@
-# GateFlow 基础设施底座（W1：Conductor + MySQL + Redis）
-# W4 扩展为 7 服务全家桶（+Kafka +Zookeeper/KRaft +gateway +worker +panel +nginx）
-# 启动：docker compose up -d
+# GateFlow 全家桶（W4：7 服务一键部署）
+# 启动：cd deploy && docker compose up -d --build
+# 国内网络拉镜像：见本目录 README.md（镜像前缀 + tag 法）
+# 宿主机端口：80(nginx入口) 5000(conductor UI) 8080(conductor API) 3307(mysql) 6379(redis) 8081(workers) 8090(gateway) 9092(kafka)
 
 name: gateflow
 
 services:
-  # 编排引擎：UI=5000，API=8080
-  # W1 用默认配置（引擎自带持久化机制，红线：不深入研究引擎内部）
   conductor:
     image: conductoross/conductor:next
     container_name: gateflow-conductor
@@ -15,8 +14,6 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
-  # 应用数据库（审计表/业务表）
-  # 注意：宿主机 3306 已被本地 MySQL 服务占用，故映射 3307
   mysql:
     image: mysql:8.4
     container_name: gateflow-mysql
@@ -25,15 +22,20 @@ services:
       MYSQL_DATABASE: gateflow
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"
+      - "3307:3306"   # 宿主机 3306 被本机 MySQL 服务占用
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro   # 首次建库自动执行
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pgateflow_dev_123"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
 
-  # 限流 + 缓存
   redis:
     image: redis:7-alpine
     container_name: gateflow-redis
@@ -41,6 +43,102 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    restart: unless-stopped
+
+  # KRaft 单节点（无 Zookeeper）；双监听器：容器内 kafka:29092 / 宿主机 localhost:9092
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: gateflow-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093,PLAINTEXT_HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: MlU7g3nShT-eMCtK--X86sw
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.gateway
+    container_name: gateflow-gateway
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_APPLICATION_JSON: >-
+        {
+          "spring": {
+            "datasource": {"url": "jdbc:mysql://mysql:3306/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"},
+            "data": {"redis": {"host": "redis"}},
+            "kafka": {"bootstrap-servers": "kafka:29092"}
+          },
+          "gateflow": {
+            "workers-base-url": "http://workers:8081"
+          }
+        }
+      GATEFLOW_AUDIT_MODE: ${GATEFLOW_AUDIT_MODE:-kafka}
+      # 压测时放宽限流：GATEFLOW_RATELIMIT_MAXREQUESTS=1000000 docker compose up -d gateway
+      GATEFLOW_RATELIMIT_MAXREQUESTS: ${GATEFLOW_RATELIMIT_MAXREQUESTS:-10}
+    env_file:
+      - ../.env   # JWT_SECRET
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
+  workers:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.workers
+    container_name: gateflow-workers
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_APPLICATION_JSON: >-
+        {
+          "spring": {
+            "datasource": {"url": "jdbc:mysql://mysql:3306/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"}
+          },
+          "gateflow": {
+            "conductor-api": "http://conductor:8080/api",
+            "rag": {"docs-path": "/app/knowledge"}
+          }
+        }
+    env_file:
+      - ../.env   # DEEPSEEK_API_KEY
+    volumes:
+      - ./knowledge:/app/knowledge   # 换语料改这里，免重建镜像
+    depends_on:
+      mysql:
+        condition: service_healthy
+      conductor:
+        condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: gateflow-nginx
+    ports:
+      - "8088:80"   # 宿主机 80 被其他程序占用，统一入口走 8088
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway
+      - workers
     restart: unless-stopped
 
 volumes:

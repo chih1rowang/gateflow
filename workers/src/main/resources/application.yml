@@ -25,5 +25,7 @@ gateflow:
   rag:
     # 制度文档库（相对于仓库根目录启动；IDEA 里运行请把工作目录设为仓库根）
     docs-path: ./deploy/knowledge
-    # 每次检索返回的最相关片段数（W4 将用评测集调优此值）
+    # 每次检索返回的最相关片段数
     max-results: 3
+    # 混合检索（BM25+向量 RRF 融合）：W4 评测 97.0%→100.0%，胜出设为默认
+    hybrid: true

@@ -1,0 +1,6 @@
+# workers 镜像：JRE 21 + fat jar（构建上下文=仓库根，jar 已由宿主机 mvn package 产出）
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY workers/target/gateflow-workers-0.0.1-SNAPSHOT.jar app.jar
+# 知识库由 compose 以卷挂载到 /app/knowledge（换语料免重建镜像）
+ENTRYPOINT ["java", "-jar", "app.jar"]

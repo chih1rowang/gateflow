@@ -20,6 +20,11 @@ public class AuditLog {
     private String rejectedReason;
     private Integer latencyMs;
     private LocalDateTime createdAt;
+    /** 幂等消息键（Kafka 模式下生成；唯一索引去重） */
+    private String msgId;
+
+    public String getMsgId() { return msgId; }
+    public void setMsgId(String msgId) { this.msgId = msgId; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

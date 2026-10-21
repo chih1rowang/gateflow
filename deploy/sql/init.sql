@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS approved_drafts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='已批准草稿存档（persist_draft 写入）';
 
 -- 种子数据（幂等：先清再插，重复执行不翻倍）
-TRUNCATE expense_logs_never;
 INSERT INTO expense_records (activity_name, item, amount, spender, spent_at) VALUES
 ('摄影社春季外拍采风', '包车费（往返）', 320.00, '王同学', '2026-09-05'),
 ('摄影社春季外拍采风', '景点门票（10人）', 200.00, '王同学', '2026-09-05'),
@@ -57,7 +56,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   params_snippet TEXT COMMENT '请求参数截断（500 字符）',
   rejected_reason VARCHAR(32) NOT NULL DEFAULT 'none' COMMENT 'none/unauthorized/rate_limited',
   latency_ms     INT,
+  msg_id         VARCHAR(64) NULL COMMENT 'Kafka 幂等消息键',
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_client_time (client_name, created_at),
-  INDEX idx_tool_time (tool_name, created_at)
+  INDEX idx_tool_time (tool_name, created_at),
+  UNIQUE KEY uk_msg_id (msg_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MCP 网关调用审计';
+
+-- msg_id 已并入建表语句（MySQL 8 不支持 ADD COLUMN IF NOT EXISTS）

@@ -161,3 +161,24 @@ Lua 原子执行：ZREMRANGEBYSCORE(0, now-window) 清窗外 → ZCARD 计数 �
 
 追加修正：①init.sql 种子段改为 TRUNCATE+INSERT 幂等（此前追加 DDL 重跑导致数据翻倍，实查 20 行→修正 10 行）；②db_query 守卫拒绝改为业务错误返回（gateway 解析 error 字段输出"rejected: 仅放行 SELECT"），替代原先的 500。
 审计初值：单次 /mcp 调用网关开销 4-6ms（限流判定+审计写入同步）——W4 压测的基线数字。
+
+## 4. W4：异步审计、全家桶与数字（2026-10-21 收官，三项验收全过）
+
+### 4.1 Kafka 异步审计（钩子3 演进闭环）
+AuditWriter 双模式（gateflow.audit.mode: sync|kafka）：sync=请求线程直写（W3 形态）；kafka=发消息即返、@KafkaListener 消费者 INSERT IGNORE（msg_id 唯一键幂等）落库。producer acks=all。发送失败降级同步写。
+
+### 4.2 compose 全家桶（验收①）
+7 服务：conductor/mysql(自动执行 init.sql)/redis/kafka(KRaft 单节点双监听器：容器 kafka:29092、宿主机 localhost:9092)/gateway/workers(镜像=Dockerfile+jre21+fat jar；SPRING_APPLICATION_JSON 覆写容器内地址；知识库卷挂载)/nginx(8088→80)。实测：**清卷后 up 7 秒可用（首次含构建 89 秒）**，验收线 600 秒。
+
+### 4.3 压测（验收②，JMeter 5.6.3 CLI，50 线程×60s，固定会话，经 nginx 全链路）
+| 审计模式 | QPS | P95 | P99 | 错误 |
+|---|---|---|---|---|
+| 同步 | 1,290 | 64ms | 115ms | 0 |
+| Kafka | **5,497** | **11ms** | 13ms | 0 |
+完整报告 deploy/perf/REPORT.md。过程发现：①initialize 灌压约 10 万请求触发 MCP 会话上限→503（会话无过期回收，Roadmap）；②消费者逐条 INSERT 追积压仅 ~100 条/s（批量消费为 Roadmap）——两坑均已文档化。
+
+### 4.4 评测与混合检索（验收③）
+评测集 100 条（9 文档，作者自标）。纯向量 97.0% → BM25(中文字符二元组)+向量 RRF 融合 **100.0%**（recall@3）。hybrid 已设生产默认。诚实边界：语料 19 片段有天花板效应，数字不可外推；3 个失分项均为字面精确题，符合 BM25 补短板预期。评测脚本 RecallEvalTest 可复现。
+
+### 4.5 术语纪律提醒
+对外表述："审计异步化后吞吐提升约 4 倍（1290→5497 QPS）、P95 由 64ms 降至 11ms"；RAG 写"自建 100 条评测集，召回率 97%→100%，语料规模下存在天花板效应已在报告中说明"。

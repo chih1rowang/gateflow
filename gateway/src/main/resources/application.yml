@@ -18,6 +18,14 @@ spring:
     redis:
       host: localhost
       port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+      retries: 3
+    consumer:
+      group-id: gateflow-audit-consumer
+      auto-offset-reset: earliest
 
 server:
   port: 8090
@@ -33,3 +41,6 @@ gateflow:
     max-requests: 10
   # 工具宿主（workers）地址——gateway 是纯门口，工具实现全在那边
   workers-base-url: http://localhost:8081
+  audit:
+    # sync=直写MySQL（W3形态，压测对照）| kafka=异步落库（W4形态，压测实验）——成对数字的开关
+    mode: sync
