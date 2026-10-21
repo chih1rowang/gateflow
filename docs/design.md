@@ -126,3 +126,38 @@ W2 验收映射：①停在人工节点/批准走完 ✅D1（落库部分 D2-3 �
 **知识库热重载**：POST /admin/knowledge/reload → volatile 换库（RagTasks.reload）。实测：新增场地预约制度.md→reload(5 docs)→仅新文档可答的问题正确回答并带出处。
 
 **编码方法论（终版，替代 Day2 版）**：①命令行内联中文进 curl 参数=绝对禁止（服务端拒收）；②中文请求体必经 UTF-8 文件（Write 工具最稳）；③验证数据真身用 HEX/码点（unicode_escape），终端显示不可信（本会话显示层全程 GBK，数据实为干净 UTF-8）。
+
+## 3. W3：网关三件套（JWT / 限流 / 审计）+ 三工具上线
+
+### 3.1 架构决策：gateway 是纯门口，工具实现全在 workers
+
+gateway 的 @McpTool 方法只做转发（RestClient → workers:8081 的 /api/search、/api/db-query、/api/ticket），不直接碰数据库/RAG。理由：①红线"网关只做四件事"（鉴权/限流/审计/工具注册），工具本体留在工具宿主进程；②同一实现同时服务两条消费路径（workflow 的 @WorkerTask 和 HTTP 的 REST——workers 里 ToolsApiController 直接复用 DbTasks/TicketTasks/RagTasks 的方法）；③与 agentgateway"代理到后端"的形态一致。代价：一跳 HTTP（内网 <5ms，可接受）。
+
+### 3.2 JWT 校验流程
+
+过滤器顺序（均为 OncePerRequestFilter，只拦 /mcp）：**Audit（最外层，记录一切）→ JWT → 限流**。
+JWT：Authorization: Bearer <token>；HS256 签名（密钥来自 .env 的 JWT_SECRET，仅运行时）；校验签名+过期；sub 声明=客户端身份（后续限流与审计的 key）。缺失/伪造/过期 → 401 {"error":"unauthorized"}。签发：POST /admin/token?client=xxx（开发用，返回 token+过期时间，TTL 可配默认 24h）。
+注意区分：JWT=应用层身份认证；Mcp-Session-Id=协议层会话（Day4 精读），互不相干。
+
+### 3.3 限流：Redis 滑动窗口（ZSET + Lua 原子化）
+
+```
+key = ratelimit:{client}（窗口 60s，上限 max-requests 默认 10）
+Lua 原子执行：ZREMRANGEBYSCORE(0, now-window) 清窗外 → ZCARD 计数 → ≥max 则拒绝 → 否则 ZADD(now, now-随机后缀) + EXPIRE
+超限 → 429 {"error":"rate_limited"}
+为什么滑动窗口不用令牌桶：目标恰是防"模型失控式突发"，令牌桶允许突发与目标相反；ZSET 一个键搞定、窗口语义直读。原子性靠 Lua 单线程执行（Redis 单线程执行脚本期间不插入其他命令——八股点）。
+```
+
+### 3.4 审计（同步版，W4 改 Kafka 异步）
+
+最外层过滤器：ContentCachingRequestWrapper 缓存请求体 → doFilter 计时 → 事后解析 JSON-RPC（method、tools/call 时的工具名与参数截断 500 字符）→ 连同 client（401 时 unknown）、http_status、rejected_reason（none/unauthorized/rate_limited）、latency_ms 写 audit_logs。同步写是刻意的演进起点（钩子 3：压测暴露瓶颈后改 Kafka，commit 历史即证据）。
+
+### 3.5 验收标准（立项文档原文五项）
+①无 token→401 ②错 token→401 ③对 token→tools/list 三工具 + doc_search 调用成功 ④新 client 连续第 11 次→429 ⑤audit_logs 出现完整记录
+
+### 3.6 W3 验收实录（2026-10-21，五项全过）
+
+①无 token→401 ✓ ②伪造 token→401 ✓ ③对 token：握手+tools/list 三工具（doc_search/db_query/ticket_create）+ doc_search 调用返回"单笔报销上限 500 元"原文（672 字符）✓ ④新 client 连发 12 次：200×10 → **429×2**（窗口 60s/上限 10）✓ ⑤audit_logs 完整记录（含 tools/call 的工具名+参数摘要+25ms 耗时，429 行 rejected_reason=rate_limited）
+
+追加修正：①init.sql 种子段改为 TRUNCATE+INSERT 幂等（此前追加 DDL 重跑导致数据翻倍，实查 20 行→修正 10 行）；②db_query 守卫拒绝改为业务错误返回（gateway 解析 error 字段输出"rejected: 仅放行 SELECT"），替代原先的 500。
+审计初值：单次 /mcp 调用网关开销 4-6ms（限流判定+审计写入同步）——W4 压测的基线数字。

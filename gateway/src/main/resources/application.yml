@@ -1,12 +1,35 @@
 spring:
   application:
     name: gateflow-gateway
+  config:
+    import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
   ai:
     mcp:
       server:
         name: gateflow-gateway
         # Streamable HTTP 传输（SSE 传输自 Spring AI 2.0 起废弃——本身就是一道八股）
         protocol: STREAMABLE
+  datasource:
+    url: jdbc:mysql://localhost:3307/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: gateflow_dev_123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 server:
   port: 8090
+
+gateflow:
+  jwt:
+    # 密钥来自 .env（真值不入库）；HS256
+    secret: ${JWT_SECRET}
+    ttl-hours: 24
+  ratelimit:
+    # 滑动窗口：60 秒内每客户端最多 10 次（第 11 次 429）
+    window-seconds: 60
+    max-requests: 10
+  # 工具宿主（workers）地址——gateway 是纯门口，工具实现全在那边
+  workers-base-url: http://localhost:8081

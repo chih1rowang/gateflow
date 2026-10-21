@@ -35,10 +35,8 @@
 
 ## W3（11/2–11/8）切片：Claude Code 经网关调工具（401/429/审计）
 
-- [ ] gateway 模块：Spring AI MCP Server + @McpTool 三工具
-- [ ] JWT 过滤器：无 token→401 / 错 token→401 / 对 token→成功
-- [ ] Redis 滑动窗口限流：连续 N+1 次→429
-- [ ] MySQL 审计表（同步版，W4 改 Kafka 异步）
+- [x] W3 ✅（2026-10-21，五项验收全过）：JWT 过滤器(401×2) + Redis ZSET/Lua 滑动窗口(burst 12 次=200×10+429×2) + 审计表(含工具名/参数摘要/耗时/拒绝原因，同步版) + 三工具经 @McpTool 上线（gateway 纯门口转发 workers：/api/search、/api/db-query、/api/ticket；DELETE 被 SELECT 守卫干净拒绝）
+- [ ] **投递准备：简历"进行中"版（private/notes/简历-W3版.md 已备），本周开投**
 - [ ] **开始投日常实习（简历"开发中"版）**
 - [ ] 补课层4（网关为什么存在）+ W3 问答卡
 

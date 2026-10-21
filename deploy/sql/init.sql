@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS approved_drafts (
   UNIQUE KEY uk_workflow_id (workflow_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='已批准草稿存档（persist_draft 写入）';
 
--- 2026-09（上个月）经费流水种子数据
+-- 种子数据（幂等：先清再插，重复执行不翻倍）
+TRUNCATE expense_logs_never;
 INSERT INTO expense_records (activity_name, item, amount, spender, spent_at) VALUES
 ('摄影社春季外拍采风', '包车费（往返）', 320.00, '王同学', '2026-09-05'),
 ('摄影社春季外拍采风', '景点门票（10人）', 200.00, '王同学', '2026-09-05'),
@@ -45,3 +46,18 @@ INSERT INTO expense_records (activity_name, item, amount, spender, spent_at) VAL
 ('迎新晚会', '音响设备租赁', 800.00, '张同学', '2026-09-20'),
 ('迎新晚会', '嘉宾礼品', 350.00, '张同学', '2026-09-21'),
 ('社团联合招新', '易拉宝与传单', 275.00, '陈同学', '2026-09-25');
+
+-- W3：网关审计表（gateway 同步写入；W4 改 Kafka 异步）
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+  client_name    VARCHAR(64) NOT NULL COMMENT '调用方（JWT sub；401 时为 unknown）',
+  http_status    INT COMMENT '本次响应状态码',
+  rpc_method     VARCHAR(64) COMMENT 'JSON-RPC 方法（initialize/tools_list/tools_call）',
+  tool_name      VARCHAR(64) COMMENT 'tools/call 时的工具名',
+  params_snippet TEXT COMMENT '请求参数截断（500 字符）',
+  rejected_reason VARCHAR(32) NOT NULL DEFAULT 'none' COMMENT 'none/unauthorized/rate_limited',
+  latency_ms     INT,
+  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_client_time (client_name, created_at),
+  INDEX idx_tool_time (tool_name, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MCP 网关调用审计';
