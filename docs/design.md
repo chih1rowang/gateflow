@@ -1,8 +1,7 @@
 # GateFlow 技术设计（渐进式）
 
-> 本文档永远比代码先行一小步，严禁瀑布式写全。当前只有第 1 节（W1 所需）；
-> W2 末补 human task 流程与 SSE 接口定义；W3 末补审计表 DDL、JWT 校验流程、限流算法伪码；W4 末补 compose 拓扑与压测方案。
-> 与代码对不上 = vibe coding 跑偏的信号，立即停下核对。
+> 本文档永远比代码先行一小步，严禁瀑布式写全；与代码对不上 = vibe coding 跑偏的信号，立即停下核对。
+> 节奏：W1 节已落地；W2 节于 W2D1 增补（见文末 §2）；W3 末补审计 DDL/JWT/限流伪码；W4 末补 compose 拓扑与压测方案。
 
 ## 1. 模块图与 W1 最小切片（2026-10-19）
 
@@ -91,3 +90,20 @@ W1 验收实录：问"单笔报销上限是多少？超过怎么办" → 回答�
 - workflow 定义：`deploy/workflows/*.json`，注册 `PUT /api/metadata/workflow`，触发 `POST /api/workflow/{name}`；执行详情 `GET /api/workflow/{id}`（此版本无 `/status` 子路径）
 - Day2 切片：`gateflow_demo` = 单任务 `echo_demo`，已跑通 COMPLETED（execution: 输入输出在 UI Executions 页可见）；后续节点按同模式原位扩展
 - 踩坑记录：① conductor 容器偶发端口代理失效（8080 未监听），`docker compose up -d --force-recreate conductor` 解决；② Windows 命令行发中文 JSON 会被 GBK 编码搞坏，请求体一律写 UTF-8 文件再 `--data @file`
+
+## 2. W2：人工审核与断点恢复
+
+### 2.1 draft_review 工作流（W2D1）
+
+```
+rag_retriever → llm_answer → human_review(HUMAN) → echo(终态回显)
+```
+
+| 节点 | 类型 | 说明 |
+|---|---|---|
+| rag_retriever / llm_answer | SIMPLE | 复用 W1 现有 worker，不变 |
+| human_review | **HUMAN（系统任务，零 Java 代码）** | 到达后挂起等待外部审批；输入携带草稿与问题；审批输出约定 `{decision: APPROVED\|REJECTED, comment}` |
+| echo | SIMPLE | 终态回显（W2D2-3 由落库动作替换） |
+
+预期行为（已实测验证，2026-10-21）：触发后流程停在 human_review（workflow RUNNING、该 task IN_PROGRESS，可无限期等待——状态在引擎库）；审批走 **`POST /api/tasks`**，体为 `{taskId, workflowInstanceId, status:"COMPLETED", outputData:{decision, comment}}`（PUT /api/tasks/{id} 不支持，实测 500）；写完引擎立即续跑。执行实录 7a38edd1：rag→llm 完成、HUMAN 挂起、批准后 echo 完成，最终输出携带审批结论。
+W2 验收映射：①停在人工节点/批准走完 ✅D1（落库部分 D2-3 补）②SSE 逐 chunk（D4）③kill -9 恢复（D2-3）。

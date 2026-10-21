@@ -21,6 +21,8 @@
 
 ## W2（10/26–11/1）切片：+ 人工审核节点 + 断点恢复
 
+- [x] W2D1 ✅（2026-10-21 提前开工）：draft_review 工作流（rag→llm→HUMAN→echo）实测通过——停在人工节点、POST /api/tasks 批准后走完，审批结论流入最终输出（执行 7a38edd1）。**W2 验收①主体达成**（落库 D2-3 补）
+
 - [ ] 三个 worker：文档检索 / 数据库只读查询 / 工单操作
 - [ ] human task：workflow 停在人工节点，批准后走完落库
 - [ ] SSE 流式接口：curl 逐 chunk 收到输出

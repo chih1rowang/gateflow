@@ -1,0 +1,48 @@
+[
+  {
+    "name": "draft_review",
+    "description": "W2: RAG-drafted answer goes through human approval gate before finishing",
+    "version": 1,
+    "schemaVersion": 2,
+    "restartable": true,
+    "tasks": [
+      {
+        "name": "rag_retriever",
+        "taskReferenceName": "rag_ref",
+        "inputParameters": {
+          "question": "${workflow.input.question}"
+        },
+        "type": "SIMPLE"
+      },
+      {
+        "name": "llm_answer",
+        "taskReferenceName": "llm_ref",
+        "inputParameters": {
+          "question": "${workflow.input.question}",
+          "chunks": "${rag_ref.output.chunks}"
+        },
+        "type": "SIMPLE"
+      },
+      {
+        "name": "human_review",
+        "taskReferenceName": "review_ref",
+        "inputParameters": {
+          "question": "${workflow.input.question}",
+          "draft": "${llm_ref.output.answer}"
+        },
+        "type": "HUMAN"
+      },
+      {
+        "name": "echo_demo",
+        "taskReferenceName": "echo_ref",
+        "inputParameters": {
+          "text": "审核结论：${review_ref.output.decision}（${review_ref.output.comment}）"
+        },
+        "type": "SIMPLE"
+      }
+    ],
+    "outputParameters": {
+      "final": "${echo_ref.output.echoed}"
+    }
+  }
+]
