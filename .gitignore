@@ -40,3 +40,7 @@ desktop.ini
 
 # ===== 测试报告（体积大者不入库，README 摘要即可）=====
 *.jtl
+
+# 压测产物（内嵌临时令牌/会话，只留模板 loadtest.jmx）
+deploy/perf/run-*.jmx
+deploy/perf/loadtest2.jmx
