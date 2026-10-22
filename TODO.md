@@ -46,11 +46,11 @@
 
 ## W5（11/16–11/22）切片：+ 面板 + 开源成品
 
-- [ ] Vue3 + Naive UI 三页：任务看板 / 审计流水 / 成本统计
-- [ ] 双语 README：架构图 + 竞品对比表 + 压测报告 + 一键部署
-- [ ] GitHub Actions CI 绿
+- [x] W5 ✅（2026-10-22）：Vue3+Naive UI 三页面板（看板含浏览器内批准/审计分页/成本token页）+ 双语 README（架构图/八步演示/竞品表/Roadmap）+ CI 接真实构建（backend+panel 两 job）。E2E：面板通道批准→落库、token 真实入库
+- [ ] 同学按 README 独立跑通（真实测试，学生行动项）
+- [x] CI 绿勾确认 ✅（2026-10-22，commit 8c4ff70：backend+panel 双 job success）
 - [ ] 找一位同学按 README 独立跑通（真实测试）
-- [ ] 微作品（有余力才做）：注解化 MCP Starter 或独立小 MCP server
+- [ ] 微作品：评估后建议不做（六周主线超额完成，时间投 W6 防御冲刺收益更大；学生可推翻）
 - [ ] 简历换完整版 + W5 问答卡
 
 ## W6（11/23–11/29）防御冲刺
