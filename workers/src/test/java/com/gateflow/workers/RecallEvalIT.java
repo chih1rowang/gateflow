@@ -13,7 +13,7 @@ import java.util.List;
  * 运行：mvn test -Dtest=RecallEvalTest（工作目录=workers 模块）
  * 命中判据：Top3 片段的 metadata.file_name == 期望文档（我自己标注——局限如实承认）。
  */
-class RecallEvalTest {
+class RecallEvalIT {
 
     private static final int TOP_K = 3;
 

@@ -19,7 +19,8 @@
         "taskReferenceName": "llm_ref",
         "inputParameters": {
           "question": "${workflow.input.question}",
-          "chunks": "${rag_ref.output.chunks}"
+          "chunks": "${rag_ref.output.chunks}",
+          "workflowId": "${workflow.workflowId}"
         },
         "type": "SIMPLE",
         "taskDefinition": {

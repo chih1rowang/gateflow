@@ -64,3 +64,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MCP 网关调用审计';
 
 -- msg_id 已并入建表语句（MySQL 8 不支持 ADD COLUMN IF NOT EXISTS）
+
+-- W5：LLM 调用 token 用量（成本统计页数据源；llm_answer worker 每次调用写入）
+CREATE TABLE IF NOT EXISTS llm_usage (
+  id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+  workflow_id    VARCHAR(64) COMMENT '来源执行ID',
+  input_tokens   INT,
+  output_tokens  INT,
+  total_tokens   INT,
+  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_wf (workflow_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM token 用量';

@@ -136,6 +136,7 @@ services:
       - "8088:80"   # 宿主机 80 被其他程序占用，统一入口走 8088
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../panel/dist:/usr/share/nginx/html:ro
     depends_on:
       - gateway
       - workers

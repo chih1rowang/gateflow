@@ -22,6 +22,9 @@ target/
 node_modules/
 dist/
 .pnpm-store/
+# 面板构建产物入库（compose 一键跑通免 node 环境）
+!panel/dist/
+!panel/dist/**
 
 # ===== 环境与密钥（不入库）=====
 .env
