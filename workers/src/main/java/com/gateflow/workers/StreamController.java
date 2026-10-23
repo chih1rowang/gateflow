@@ -24,6 +24,8 @@ import java.util.List;
 public class StreamController {
 
     private static final Logger log = LoggerFactory.getLogger(StreamController.class);
+    /** 并发流上限：每个在流的请求占一个工作线程和一个 DeepSeek 连接，超限直接拒绝而不是堆积 */
+    private static final java.util.concurrent.Semaphore STREAM_SLOTS = new java.util.concurrent.Semaphore(8);
 
     private final RagTasks ragTasks;
     private final OpenAiStreamingChatModel streamingModel;
@@ -43,14 +45,36 @@ public class StreamController {
     @GetMapping("/stream/ask")
     public SseEmitter ask(@RequestParam("q") String question) {
         SseEmitter emitter = new SseEmitter(120_000L);
+        if (!STREAM_SLOTS.tryAcquire()) {
+            // 超出并发上限：SSE 事件流里明确告知（HTTP 200 + error 事件），客户端可读并重试
+            try {
+                emitter.send(SseEmitter.event().name("error").data("server busy: concurrent stream limit reached, retry later"));
+                emitter.complete();
+            } catch (Exception ignored) {
+            }
+            log.warn("stream/ask rejected: concurrent limit reached, q='{}'", question);
+            return emitter;
+        }
         List<String> chunks = ragTasks.retrieve(question);
         String context = String.join("\n----\n", chunks);
         log.info("stream/ask: q='{}' retrieved {} chunks, streaming starts", question, chunks.size());
 
-        // 每请求一线程的朴素实现（守护线程：不阻塞 JVM 关闭）；W4 压测时换线程池（对应"线程池七参数"八股）
+        // 每请求一线程的朴素实现（守护线程：不阻塞 JVM 关闭）；并发上限由 STREAM_SLOTS 把守
         Thread worker = new Thread(() -> {
             try {
-                streamingModel.chat(List.of(
+                runStream(emitter, question, context);
+            } finally {
+                STREAM_SLOTS.release();
+            }
+        }, "sse-ask");
+        worker.setDaemon(true);
+        worker.start();
+        return emitter;
+    }
+
+    private void runStream(SseEmitter emitter, String question, String context) {
+        try {
+            streamingModel.chat(List.of(
                         SystemMessage.from(LlmTasks.SYSTEM_PROMPT.formatted(context)),
                         UserMessage.from(question)),
                         new StreamingChatResponseHandler() {
@@ -80,12 +104,8 @@ public class StreamController {
                                 emitter.completeWithError(error);
                             }
                         });
-            } catch (Exception e) {
-                emitter.completeWithError(e);
-            }
-        }, "sse-ask");
-        worker.setDaemon(true);
-        worker.start();
-        return emitter;
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
     }
 }

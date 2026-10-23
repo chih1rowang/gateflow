@@ -36,8 +36,16 @@ public class DbTasks {
                    @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.url}") String roUrl,
                    @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.username}") String roUser,
                    @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.password}") String roPass) {
-        // DriverManagerDataSource：无连接池，db_query 低频足够；不复用主数据源（root）是本修复的核心
-        this.roJdbc = new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(roUrl, roUser, roPass));
+        // 只读账号独立连接池（上限 4）：压力测试（50 并发）显示"每请求新建连接"能扛但连接数无上界，
+        // 真实突刺下会在 MySQL 侧堆积连接——池化封顶后多余的并发在 5 秒内拿到明确超时而不是拖垮数据库
+        com.zaxxer.hikari.HikariConfig cfg = new com.zaxxer.hikari.HikariConfig();
+        cfg.setJdbcUrl(roUrl);
+        cfg.setUsername(roUser);
+        cfg.setPassword(roPass);
+        cfg.setMaximumPoolSize(4);
+        cfg.setPoolName("gateflow-ro");
+        cfg.setConnectionTimeout(5_000);
+        this.roJdbc = new JdbcTemplate(new com.zaxxer.hikari.HikariDataSource(cfg));
         this.draftMapper = draftMapper;
     }
 
