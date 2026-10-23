@@ -29,6 +29,10 @@ public class TicketTasks {
     @WorkerTask("ticket_create")
     public @OutputParam("ticketId") Long create(@InputParam("title") String title,
                                                 @InputParam("content") String content) {
+        // 标题由"[报销申请] + 问题原文"拼出，可能超数据库列上限 200——截断防插入失败（审查报告轻微 14）
+        if (title != null && title.length() > 180) {
+            title = title.substring(0, 180);
+        }
         Ticket existing = ticketMapper.selectOne(
                 new QueryWrapper<Ticket>().eq("title", title));
         if (existing != null) {

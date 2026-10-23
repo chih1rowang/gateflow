@@ -18,6 +18,14 @@ server:
 gateflow:
   # Conductor 引擎的 API 地址（docker-compose 里的 conductor 容器）
   conductor-api: http://localhost:8080/api
+  # 管理端点共享口令（/admin/** 与 /stream/** 必须携带 X-Admin-Token: <该值>）
+  admin-token: ${GATEFLOW_ADMIN_TOKEN:dev-admin-token}
+  # db_query 专用只读账号：只对 expense_records 一张表有 SELECT 权限（纵深防御第二层）
+  db:
+    ro:
+      url: ${GATEFLOW_RO_URL:jdbc:mysql://localhost:3307/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+      username: gateflow_ro
+      password: gateflow_ro_pw
   deepseek:
     base-url: https://api.deepseek.com
     model-name: deepseek-chat

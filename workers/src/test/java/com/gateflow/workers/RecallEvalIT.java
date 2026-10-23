@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * W4 验收③：自建 100 条评测集，对比纯向量检索与混合检索（BM25+RRF）的 recall@3。
- * 运行：mvn test -Dtest=RecallEvalTest（工作目录=workers 模块）
+ * 运行：mvn test -Dtest=RecallEvalIT（工作目录=workers 模块；类名以 IT 结尾，CI 的 surefire 不自动跑）
  * 命中判据：Top3 片段的 metadata.file_name == 期望文档（我自己标注——局限如实承认）。
  */
 class RecallEvalIT {

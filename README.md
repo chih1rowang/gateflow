@@ -26,9 +26,12 @@ AI coding assistants (Cursor, or any MCP client) cannot reach your internal syst
 ## Quick start（一键全家桶）
 
 ```bash
-git clone https://github.com/chih1rowang/gateflow && cd gateflow/deploy
+git clone https://github.com/chih1rowang/gateflow && cd gateflow
+cp .env.example .env                   # 填入 DEEPSEEK_API_KEY / JWT_SECRET / GATEFLOW_ADMIN_TOKEN
+cd deploy
 docker compose up -d --build          # 7 服务：conductor/mysql/redis/kafka/gateway/workers/nginx
 # 首次启动约 1-2 分钟（构建镜像）；清空数据卷后重建实测 7 秒
+# 对外仅暴露 8088（nginx 入口）；MySQL/Redis/Kafka/Conductor 等仅绑定 127.0.0.1
 ```
 
 | 入口 | 地址 |
@@ -38,12 +41,22 @@ docker compose up -d --build          # 7 服务：conductor/mysql/redis/kafka/g
 | Conductor 执行 UI | http://localhost:5000 |
 
 ```bash
-# 拿一个令牌（无令牌调用一律 401；60 秒超 10 次调用返回 429）
-curl -X POST "http://localhost:8088/admin/token?client=demo"
+# 拿一个令牌（管理端点需 X-Admin-Token 口令，即 .env 里的 GATEFLOW_ADMIN_TOKEN；
+# 无令牌调用 /mcp 一律 401；60 秒超 10 次调用返回 429）
+curl -X POST "http://localhost:8088/admin/token?client=demo" -H "X-Admin-Token: <GATEFLOW_ADMIN_TOKEN>"
 # 用 MCP Inspector 连 http://localhost:8088/mcp（Authentication 填 Bearer <token>）即可看到三个工具
 ```
 
-换成你自己的知识库：把 Markdown 文档放进 `deploy/knowledge/`，`curl -X POST http://localhost:8088/admin/knowledge/reload`（或重启 workers）后提问即可。
+换成你自己的知识库：把 Markdown 文档放进 `deploy/knowledge/`，
+`curl -X POST http://localhost:8088/admin/knowledge/reload -H "X-Admin-Token: <GATEFLOW_ADMIN_TOKEN>"`（或重启 workers）后提问即可。
+
+### 安全基线
+
+- 对外只开放 nginx 入口（8088）；工具接口（workers `/api/**`）仅网关经容器内网调用，外部不可达
+- 双层身份：客户端走 JWT（`/mcp`）；管理面板/令牌签发/流式问答/审批走 `X-Admin-Token` 口令
+- `db_query` 双层只读：代码守卫（单条 SELECT、禁多语句/写文件/加锁子句）+ 专用只读账号
+  `gateflow_ro`（仅 `expense_records` 一张表的 SELECT 权限，UNION 读其他表会被数据库直接拒绝）
+- 全量审计：`/mcp` 每次调用（含 401/429 与畸形请求）经 Kafka 异步落库，`msg_id` 唯一键幂等
 
 ## 一次完整演示（8 步）
 

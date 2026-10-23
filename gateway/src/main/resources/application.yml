@@ -31,6 +31,8 @@ server:
   port: 8090
 
 gateflow:
+  # 管理端点共享口令（/admin/** 必须携带 X-Admin-Token: <该值>；生产从环境变量注入）
+  admin-token: ${GATEFLOW_ADMIN_TOKEN:dev-admin-token}
   jwt:
     # 密钥来自 .env（真值不入库）；HS256
     secret: ${JWT_SECRET}

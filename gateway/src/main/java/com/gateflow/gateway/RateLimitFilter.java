@@ -26,16 +26,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final DefaultRedisScript<Long> SLIDING_WINDOW = new DefaultRedisScript<>("""
             local key = KEYS[1]
             local now = tonumber(ARGV[1])
-            local window = tonumber(ARGV[2])
+            local windowMs = tonumber(ARGV[2])
             local max = tonumber(ARGV[3])
             local member = ARGV[4]
-            redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+            local windowSec = tonumber(ARGV[5])
+            redis.call('ZREMRANGEBYSCORE', key, 0, now - windowMs)
             local count = redis.call('ZCARD', key)
             if count >= max then
                 return -1
             end
             redis.call('ZADD', key, now, member)
-            redis.call('EXPIRE', key, window)
+            redis.call('EXPIRE', key, windowSec)
             return count + 1
             """, Long.class);
 
@@ -67,7 +68,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 String.valueOf(now),
                 String.valueOf(windowSeconds * 1000),
                 String.valueOf(maxRequests),
-                now + "-" + UUID.randomUUID());
+                now + "-" + UUID.randomUUID(),
+                String.valueOf(windowSeconds));
         if (result != null && result == -1) {
             response.setStatus(429);
             response.setContentType("application/json");

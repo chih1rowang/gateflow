@@ -70,6 +70,7 @@
 <script setup>
 import { ref, computed, onMounted, h } from 'vue'
 import { NButton, NTag, useMessage } from 'naive-ui'
+import { adminFetch } from '../adminToken'
 
 const message = useMessage()
 const rows = ref([])
@@ -100,17 +101,23 @@ const cols = [
 async function load() {
   loading.value = true
   try {
-    const r = await fetch('/conductor/api/workflow/search?size=30')
+    const r = await adminFetch('/conductor/api/workflow/search?size=30')
     const d = await r.json()
     rows.value = d.results || []
+  } catch (e) {
+    message.error(String(e.message || e))
   } finally { loading.value = false }
 }
 
 async function openDetail(row) {
   current.value = row
-  const r = await fetch('/conductor/api/workflow/' + row.workflowId)
-  detail.value = await r.json()
-  detailShow.value = true
+  try {
+    const r = await adminFetch('/conductor/api/workflow/' + row.workflowId)
+    detail.value = await r.json()
+    detailShow.value = true
+  } catch (e) {
+    message.error(String(e.message || e))
+  }
 }
 
 let approveTask = null
@@ -119,7 +126,7 @@ function openApprove(t) { approveTask = t; decision.value = 'APPROVED'; comment.
 async function submitApprove() {
   approving.value = true
   try {
-    const r = await fetch('/conductor/api/tasks', {
+    const r = await adminFetch('/conductor/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -135,9 +142,11 @@ async function submitApprove() {
 }
 
 async function trigger() {
+  if (!newQuestion.value.trim()) { message.warning('请输入问题'); return }
   triggering.value = true
   try {
-    const r = await fetch('/conductor/api/workflow/draft_review?version=2', {
+    // 不带 version 参数：Conductor 默认使用该工作流的最新版本（此前硬编码 version=2）
+    const r = await adminFetch('/conductor/api/workflow/draft_review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: newQuestion.value })

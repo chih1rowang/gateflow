@@ -47,7 +47,7 @@ public class StreamController {
         String context = String.join("\n----\n", chunks);
         log.info("stream/ask: q='{}' retrieved {} chunks, streaming starts", question, chunks.size());
 
-        // 每请求一线程的朴素实现；W4 压测时换线程池（对应"线程池七参数"八股）
+        // 每请求一线程的朴素实现（守护线程：不阻塞 JVM 关闭）；W4 压测时换线程池（对应"线程池七参数"八股）
         Thread worker = new Thread(() -> {
             try {
                 streamingModel.chat(List.of(
@@ -84,6 +84,7 @@ public class StreamController {
                 emitter.completeWithError(e);
             }
         }, "sse-ask");
+        worker.setDaemon(true);
         worker.start();
         return emitter;
     }

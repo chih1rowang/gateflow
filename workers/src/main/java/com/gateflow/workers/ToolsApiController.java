@@ -39,7 +39,16 @@ public class ToolsApiController {
         } catch (IllegalArgumentException e) {
             // 守卫拒绝不是服务器错误：以业务错误返回，让网关工具层拿到可读信息
             return Map.of("error", e.getMessage());
+        } catch (org.springframework.dao.DataAccessException e) {
+            // 数据库层拒绝（如只读账号越权读其他表：SELECT command denied）同样以可读错误返回
+            return Map.of("error", "database rejected: " + rootMessage(e));
         }
+    }
+
+    private static String rootMessage(Throwable e) {
+        Throwable t = e;
+        while (t.getCause() != null) t = t.getCause();
+        return t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
     }
 
     @PostMapping("/api/ticket")

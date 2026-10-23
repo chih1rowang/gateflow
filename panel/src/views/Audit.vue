@@ -13,14 +13,17 @@
 
 <script setup>
 import { ref, reactive, onMounted, h } from 'vue'
-import { NTag } from 'naive-ui'
+import { NTag, useMessage } from 'naive-ui'
+import { adminFetch } from '../adminToken'
 
+const message = useMessage()
 const rows = ref([])
 const loading = ref(false)
 const client = ref('')
 const pagination = reactive({
   page: 1, pageSize: 20, itemCount: 0,
-  onChange: p => { pagination.page = p; load() }
+  onChange: p => { pagination.page = p; load() },
+  onPageSizeChange: ps => { pagination.pageSize = ps; load(1) }
 })
 
 const cols = [
@@ -42,10 +45,12 @@ async function load(page) {
   try {
     const q = new URLSearchParams({ page: pagination.page, size: pagination.pageSize })
     if (client.value) q.set('client', client.value)
-    const r = await fetch('/admin/audit?' + q)
+    const r = await adminFetch('/admin/audit?' + q)
     const d = await r.json()
     rows.value = d.rows || []
     pagination.itemCount = d.total || 0
+  } catch (e) {
+    message.error(String(e.message || e))
   } finally { loading.value = false }
 }
 

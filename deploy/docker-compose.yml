@@ -1,7 +1,9 @@
-# GateFlow 全家桶（W4：7 服务一键部署）
+# GateFlow 全家桶（W4：7 服务一键部署；2026-10 安全加固见审查报告）
 # 启动：cd deploy && docker compose up -d --build
 # 国内网络拉镜像：见本目录 README.md（镜像前缀 + tag 法）
-# 宿主机端口：80(nginx入口) 5000(conductor UI) 8080(conductor API) 3307(mysql) 6379(redis) 8081(workers) 8090(gateway) 9092(kafka)
+# 对外仅暴露 nginx 入口 8088；其余端口全部绑定 127.0.0.1（只供本机开发调试，
+# 局域网不可达；容器之间走内部网络通信，不依赖这些映射）：
+#   127.0.0.1:5000(conductor UI) 8080(conductor API) 3307(mysql) 6379(redis) 9092(kafka) 8090(gateway)
 
 name: gateflow
 
@@ -10,8 +12,8 @@ services:
     image: conductoross/conductor:next
     container_name: gateflow-conductor
     ports:
-      - "5000:5000"
-      - "8080:8080"
+      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
 
   mysql:
@@ -22,7 +24,7 @@ services:
       MYSQL_DATABASE: gateflow
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"   # 宿主机 3306 被本机 MySQL 服务占用
+      - "127.0.0.1:3307:3306"   # 宿主机 3306 被本机 MySQL 服务占用
     volumes:
       - mysql-data:/var/lib/mysql
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro   # 首次建库自动执行
@@ -40,7 +42,7 @@ services:
     image: redis:7-alpine
     container_name: gateflow-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -50,7 +52,7 @@ services:
     image: apache/kafka:3.9.0
     container_name: gateflow-kafka
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -73,7 +75,7 @@ services:
       dockerfile: deploy/docker/Dockerfile.gateway
     container_name: gateflow-gateway
     ports:
-      - "8090:8090"
+      - "127.0.0.1:8090:8090"
     environment:
       SPRING_APPLICATION_JSON: >-
         {
@@ -105,8 +107,7 @@ services:
       context: ..
       dockerfile: deploy/docker/Dockerfile.workers
     container_name: gateflow-workers
-    ports:
-      - "8081:8081"
+    # 不向宿主机发布端口：/api/** 只允许网关经内部网络调用（审查报告严重 1）
     environment:
       SPRING_APPLICATION_JSON: >-
         {
@@ -115,11 +116,12 @@ services:
           },
           "gateflow": {
             "conductor-api": "http://conductor:8080/api",
-            "rag": {"docs-path": "/app/knowledge"}
+            "rag": {"docs-path": "/app/knowledge"},
+            "db": {"ro": {"url": "jdbc:mysql://mysql:3306/gateflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai", "username": "gateflow_ro", "password": "gateflow_ro_pw"}}
           }
         }
     env_file:
-      - ../.env   # DEEPSEEK_API_KEY
+      - ../.env   # DEEPSEEK_API_KEY、GATEFLOW_ADMIN_TOKEN
     volumes:
       - ./knowledge:/app/knowledge   # 换语料改这里，免重建镜像
     depends_on:
@@ -133,9 +135,13 @@ services:
     image: nginx:1.27-alpine
     container_name: gateflow-nginx
     ports:
-      - "8088:80"   # 宿主机 80 被其他程序占用，统一入口走 8088
+      - "8088:80"   # 唯一对外端口（统一入口；演示口令见 .env 的 GATEFLOW_ADMIN_TOKEN）
+    # /conductor/ 的口令校验值在模板替换时取自容器环境——经 env_file 注入 ../.env 的真实值
+    env_file:
+      - ../.env
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # 官方镜像把 templates/*.template 做 envsubst 后生成 conf.d 配置（/conductor/ 口令校验需要）
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ../panel/dist:/usr/share/nginx/html:ro
     depends_on:
       - gateway

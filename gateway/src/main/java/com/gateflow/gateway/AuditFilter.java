@@ -67,13 +67,18 @@ public class AuditFilter extends OncePerRequestFilter {
             }
             String body = new String(request.getContentAsByteArray(), StandardCharsets.UTF_8);
             if (!body.isBlank()) {
-                JsonNode root = MAPPER.readTree(body);
-                String method = root.path("method").asText("");
-                row.setRpcMethod(method);
-                if ("tools/call".equals(method)) {
-                    row.setToolName(root.path("params").path("name").asText(""));
-                    String params = root.path("params").path("arguments").toString();
-                    row.setParamsSnippet(params.length() > 500 ? params.substring(0, 500) : params);
+                // 解析单独兜底：畸形请求体也必须留下审计痕迹（此前 readTree 抛异常会导致整行丢失）
+                try {
+                    JsonNode root = MAPPER.readTree(body);
+                    String method = root.path("method").asText("");
+                    row.setRpcMethod(method);
+                    if ("tools/call".equals(method)) {
+                        row.setToolName(root.path("params").path("name").asText(""));
+                        String params = root.path("params").path("arguments").toString();
+                        row.setParamsSnippet(params.length() > 500 ? params.substring(0, 500) : params);
+                    }
+                } catch (Exception parseEx) {
+                    row.setParamsSnippet("<unparseable body, length=" + body.length() + ">");
                 }
             }
             auditWriter.write(row);

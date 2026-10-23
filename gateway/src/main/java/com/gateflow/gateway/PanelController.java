@@ -24,11 +24,13 @@ public class PanelController {
         this.jdbc = jdbc;
     }
 
-    /** 审计流水：分页 + 可选按客户端过滤，倒序 */
+    /** 审计流水：分页 + 可选按客户端过滤，倒序（page/size 夹取边界：page<1 按 1，size 夹 1..200） */
     @GetMapping("/audit")
     public Map<String, Object> audit(@RequestParam(defaultValue = "1") int page,
                                      @RequestParam(defaultValue = "20") int size,
                                      @RequestParam(required = false) String client) {
+        page = Math.max(1, page);
+        size = Math.min(200, Math.max(1, size));
         String where = (client == null || client.isBlank()) ? "" : " WHERE client_name = ?";
         Object[] args = (client == null || client.isBlank())
                 ? new Object[]{size, (page - 1) * size}

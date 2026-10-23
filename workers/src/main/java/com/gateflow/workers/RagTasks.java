@@ -43,11 +43,15 @@ public class RagTasks {
 
     private final EmbeddingModel embeddingModel;
     private volatile EmbeddingStore<TextSegment> store;
-    /** 全部片段（BM25 语料；metadata 含 file_name 供评测与溯源） */
-    private volatile List<TextSegment> segments;
+    /** BM25 预建索引（reload 时随语料一起重建）：此前每次查询全量重算词频，语料变大后是瓶颈 */
+    private volatile Bm25Index bm25Index;
     private final int maxResults;
     private final String docsPath;
     private final boolean hybrid;
+
+    /** BM25 倒排统计：片段、每片段词频、词的文档频率、每片段长度、平均长度 */
+    private record Bm25Index(List<TextSegment> segs, List<Map<String, Integer>> tfs,
+                             Map<String, Integer> df, List<Integer> lens, double avgLen) {}
 
     /** Spring 注入与评测直构共用（@Value 带 defaultValue，评测侧可 new） */
     public RagTasks(@Value("${gateflow.rag.docs-path:./deploy/knowledge}") String docsPath,
@@ -70,17 +74,35 @@ public class RagTasks {
                 .embeddingStore(newStore)
                 .build();
         List<Document> documents = FileSystemDocumentLoader.loadDocuments(docsPath);
-        ingestor.ingest(documents);
-        // 手动重切一份片段留作 BM25 语料（与入库同参数，保证两路索引一致）
+        // 空目录防护：入库器对空列表抛 IllegalArgument（边界实测发现），空语料直接保持空库
+        if (!documents.isEmpty()) {
+            ingestor.ingest(documents);
+        }
+        // 手动重切一份片段留作 BM25 语料（与入库同参数，保证两路索引一致），并预建 BM25 统计
         List<TextSegment> newSegments = new ArrayList<>();
         for (Document doc : documents) {
             newSegments.addAll(splitter.split(doc));
         }
         this.store = newStore;
-        this.segments = newSegments;
+        this.bm25Index = buildIndex(newSegments);
         log.info("RAG store ready: {} documents, {} segments, hybrid={} from {}",
                 documents.size(), newSegments.size(), hybrid, docsPath);
         return documents.size();
+    }
+
+    private static Bm25Index buildIndex(List<TextSegment> corpus) {
+        int n = corpus.size();
+        List<Map<String, Integer>> tfs = new ArrayList<>(n);
+        Map<String, Integer> df = new HashMap<>();
+        List<Integer> lens = new ArrayList<>(n);
+        for (TextSegment seg : corpus) {
+            Map<String, Integer> tf = termFreq(seg.text());
+            tfs.add(tf);
+            lens.add(tf.values().stream().mapToInt(Integer::intValue).sum());
+            for (String term : tf.keySet()) df.merge(term, 1, Integer::sum);
+        }
+        double avgLen = lens.stream().mapToInt(Integer::intValue).average().orElse(1);
+        return new Bm25Index(corpus, tfs, df, lens, avgLen);
     }
 
     @WorkerTask("rag_retriever")
@@ -92,8 +114,14 @@ public class RagTasks {
 
     /** 带元数据的检索（评测与溯源用）：按模式走纯向量或混合 */
     public List<TextSegment> retrieveTop(String question) {
+        // 空白问题防护：向量模型拒绝嵌入空文本（边界实测发现），空白直接返回空结果
+        if (question == null || question.isBlank()) {
+            return List.of();
+        }
         if (!hybrid) {
-            return vectorRank(question, Math.max(maxResults, 50)).subList(0, Math.min(maxResults, 50));
+            // store.search 最多返回 min(k, 库内片段总数) 条，天然不会越界
+            // （此前 subList(0, maxResults) 在片段总数 < maxResults 时抛下标越界——审查报告中等 7）
+            return vectorRank(question, maxResults);
         }
         // 混合：两路各取深度候选（50），RRF 融合后取 TopK
         List<TextSegment> byVector = vectorRank(question, 50);
@@ -109,41 +137,35 @@ public class RagTasks {
         return matches.stream().map(EmbeddingMatch::embedded).toList();
     }
 
-    /** BM25：k1=1.5, b=0.75；中文按字符二元组分词 */
+    /** BM25：k1=1.5, b=0.75；中文按字符二元组分词（统计取自 reload 时预建的索引） */
     private List<TextSegment> bm25Rank(String question, int k) {
-        List<TextSegment> corpus = this.segments;
-        int n = corpus.size();
-        List<Map<String, Integer>> docTfs = new ArrayList<>(n);
-        Map<String, Integer> df = new HashMap<>();
-        for (TextSegment seg : corpus) {
-            Map<String, Integer> tf = termFreq(seg.text());
-            docTfs.add(tf);
-            for (String term : tf.keySet()) df.merge(term, 1, Integer::sum);
-        }
+        Bm25Index idx = this.bm25Index;
+        int n = idx.segs().size();
         Map<String, Integer> qTf = termFreq(question);
-        double avgLen = corpus.stream().mapToInt(s -> bigrams(s.text()).size()).average().orElse(1);
         final double k1 = 1.5, b = 0.75;
         record Scored(double score, TextSegment seg) {}
         List<Scored> scored = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
-            Map<String, Integer> tf = docTfs.get(i);
-            int len = bigrams(corpus.get(i).text()).size();
+            Map<String, Integer> tf = idx.tfs().get(i);
+            int len = idx.lens().get(i);
             double score = 0;
             for (String q : qTf.keySet()) {
                 Integer f = tf.get(q);
                 if (f == null) continue;
-                int dfv = df.getOrDefault(q, 1);
+                int dfv = idx.df().getOrDefault(q, 1);
                 double idf = Math.log(1 + (n - dfv + 0.5) / (dfv + 0.5));
-                score += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * len / avgLen));
+                score += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * len / idx.avgLen()));
             }
-            scored.add(new Scored(score, corpus.get(i)));
+            scored.add(new Scored(score, idx.segs().get(i)));
         }
         scored.sort((a, c) -> Double.compare(c.score(), a.score()));
         return scored.stream().limit(k).map(Scored::seg).toList();
     }
 
-    /** RRF（Reciprocal Rank Fusion）：score = Σ 1/(k+rank)，k=60；免量纲、免调权 */
-    private List<TextSegment> rrfFuse(List<TextSegment> a, List<TextSegment> b, int topK) {
+    /** RRF（Reciprocal Rank Fusion）：score = Σ 1/(k+rank)，k=60；免量纲、免调权。
+     *  TextSegment 的 equals/hashCode 按"文本+元数据"值比较（langchain4j 1.22 字节码验证过），
+     *  向量路与 BM25 路的不同实例能正确融合。static 包私有以便单测。 */
+    static List<TextSegment> rrfFuse(List<TextSegment> a, List<TextSegment> b, int topK) {
         Map<TextSegment, Double> score = new HashMap<>();
         for (int i = 0; i < a.size(); i++) score.merge(a.get(i), 1.0 / (RRF_K + i + 1), Double::sum);
         for (int i = 0; i < b.size(); i++) score.merge(b.get(i), 1.0 / (RRF_K + i + 1), Double::sum);
@@ -151,20 +173,20 @@ public class RagTasks {
         sorted.sort((x, y) -> Double.compare(y.getValue(), x.getValue()));
         Set<TextSegment> seen = new LinkedHashSet<>();
         for (var e : sorted) {
-            seen.add(e.getKey());
             if (seen.size() >= topK) break;
+            seen.add(e.getKey());
         }
         return new ArrayList<>(seen);
     }
 
-    private Map<String, Integer> termFreq(String text) {
+    private static Map<String, Integer> termFreq(String text) {
         Map<String, Integer> tf = new HashMap<>();
         for (String g : bigrams(text)) tf.merge(g, 1, Integer::sum);
         return tf;
     }
 
-    /** 中文字符二元组（英文/数字连续段整体作为一个词） */
-    private List<String> bigrams(String text) {
+    /** 中文字符二元组（英文/数字连续段整体作为一个词）。static 包私有以便单测。 */
+    static List<String> bigrams(String text) {
         List<String> out = new ArrayList<>();
         StringBuilder latin = new StringBuilder();
         List<String> chars = new ArrayList<>();

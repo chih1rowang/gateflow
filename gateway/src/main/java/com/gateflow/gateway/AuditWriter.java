@@ -46,9 +46,16 @@ public class AuditWriter {
         try {
             row.setMsgId(UUID.randomUUID().toString());
             String payload = MAPPER.writeValueAsString(row);
-            kafka.send(TOPIC, row.getClientName(), payload);
+            // send 是异步的：投递失败不会在下方 catch 抛出，必须在回调里兜底（此前 catch 接不住，
+            // Kafka 不可用期间审计会静默丢失）。insertIgnore 按 msg_id 幂等，回调与消费端重复写也无害
+            kafka.send(TOPIC, row.getClientName(), payload).whenComplete((ignored, e) -> {
+                if (e != null) {
+                    log.error("audit kafka delivery failed, fallback to sync insert: {}", e.getMessage());
+                    insert(row);
+                }
+            });
         } catch (Exception e) {
-            // 发送失败不阻断主链路；兜底策略见 design.md（本地消息表为 Roadmap）
+            // 同步失败（序列化/本地缓冲）仍走直写兜底
             log.error("audit kafka send failed, fallback to sync insert: {}", e.getMessage());
             insert(row);
         }

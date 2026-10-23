@@ -56,12 +56,19 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useMessage } from 'naive-ui'
+import { adminFetch } from '../adminToken'
 
+const message = useMessage()
 const s = ref({})
 
 async function load() {
-  const r = await fetch('/admin/stats')
-  s.value = await r.json()
+  try {
+    const r = await adminFetch('/admin/stats')
+    s.value = await r.json()
+  } catch (e) {
+    message.error(String(e.message || e))
+  }
 }
 onMounted(load)
 </script>

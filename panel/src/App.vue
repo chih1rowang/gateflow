@@ -5,6 +5,10 @@
         <b style="font-size:17px">GateFlow</b>
         <n-tag size="small" type="success" :bordered="false">管理面板</n-tag>
         <n-text depth="3" style="font-size:12px">AI 助手工具网关 · 任务看板 / 审计流水 / 成本统计</n-text>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <n-text depth="3" style="font-size:12px">口令</n-text>
+          <n-input v-model:value="adminToken" size="tiny" placeholder="X-Admin-Token" style="width:150px" type="password" show-password-on="click" />
+        </div>
       </n-layout-header>
       <n-layout has-sider style="height: calc(100vh - 52px)">
         <n-layout-sider bordered :width="160" content-style="padding:12px">
@@ -19,13 +23,16 @@
 </template>
 
 <script setup>
-import { computed, h } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NMenu, NIcon } from 'naive-ui'
+import { NMenu } from 'naive-ui'
+import { getToken, setToken } from './adminToken'
 
 const route = useRoute()
 const router = useRouter()
 const active = computed(() => route.path)
+const adminToken = ref(getToken())
+watch(adminToken, v => setToken(v))
 
 const label = t => () => t
 const menuOptions = [

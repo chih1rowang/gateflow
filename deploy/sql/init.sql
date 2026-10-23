@@ -75,3 +75,12 @@ CREATE TABLE IF NOT EXISTS llm_usage (
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_wf (workflow_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM token 用量';
+
+-- 2026-10 审查报告严重 3：db_query 专用只读账号（纵深防御第二层）
+-- 只对 expense_records 一张表授予 SELECT，其余表（审计/草稿/用量）一律不可见。
+-- 已有数据卷不会重跑本文件，手工执行一次下面的语句即可：
+--   docker exec -i gateflow-mysql mysql -uroot -p*** gateflow < init.sql
+--   （或直接在 mysql 客户端里执行这三行）
+CREATE USER IF NOT EXISTS 'gateflow_ro'@'%' IDENTIFIED BY 'gateflow_ro_pw';
+GRANT SELECT ON gateflow.expense_records TO 'gateflow_ro'@'%';
+FLUSH PRIVILEGES;

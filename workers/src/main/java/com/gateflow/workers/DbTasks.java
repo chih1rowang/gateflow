@@ -16,8 +16,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据库类任务执行器（W2）：
- * - db_query：只读查询（仅放行单条 SELECT，防注入式越权）
+ * 数据库类任务执行器（W2，安全加固见 2026-10 审查报告）：
+ * - db_query：双层只读防护。
+ *   第一层（代码守卫）：仅放行单条 SELECT——拒绝非 SELECT 开头、语句内分号（多语句）、
+ *   INTO OUTFILE/DUMPFILE（写文件）、FOR UPDATE/LOCK（加锁）、超长语句。
+ *   第二层（数据库权限）：查询走专用只读账号 gateflow_ro，仅对 expense_records 一张表有
+ *   SELECT 权限——守卫被绕过（如 UNION 读系统表）时由权限兜底。纵深防御：每层假设上一层会破。
  * - persist_draft：人工批准后的草稿落库（workflow_id 唯一键 = 幂等：重试不重复插入）
  */
 @Component
@@ -25,11 +29,15 @@ public class DbTasks {
 
     private static final Logger log = LoggerFactory.getLogger(DbTasks.class);
 
-    private final JdbcTemplate jdbc;
+    private final JdbcTemplate roJdbc;
     private final ApprovedDraftMapper draftMapper;
 
-    public DbTasks(JdbcTemplate jdbc, ApprovedDraftMapper draftMapper) {
-        this.jdbc = jdbc;
+    public DbTasks(ApprovedDraftMapper draftMapper,
+                   @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.url}") String roUrl,
+                   @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.username}") String roUser,
+                   @org.springframework.beans.factory.annotation.Value("${gateflow.db.ro.password}") String roPass) {
+        // DriverManagerDataSource：无连接池，db_query 低频足够；不复用主数据源（root）是本修复的核心
+        this.roJdbc = new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(roUrl, roUser, roPass));
         this.draftMapper = draftMapper;
     }
 
@@ -37,12 +45,25 @@ public class DbTasks {
     public @OutputParam("rows") List<Map<String, Object>> query(@InputParam("sql") String sql) {
         String trimmed = sql == null ? "" : sql.trim();
         if (trimmed.endsWith(";")) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1);
+            trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
         }
-        if (!trimmed.toLowerCase().startsWith("select")) {
+        String lower = trimmed.toLowerCase();
+        if (!lower.startsWith("select")) {
             throw new IllegalArgumentException("db_query 仅放行 SELECT 查询，收到: " + sql);
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(trimmed);
+        if (trimmed.contains(";")) {
+            throw new IllegalArgumentException("db_query 仅放行单条语句（检测到语句内分号）");
+        }
+        if (lower.contains("into outfile") || lower.contains("into dumpfile")) {
+            throw new IllegalArgumentException("db_query 禁止 INTO OUTFILE/DUMPFILE");
+        }
+        if (lower.contains("for update") || lower.contains("lock in share mode")) {
+            throw new IllegalArgumentException("db_query 禁止加锁子句");
+        }
+        if (trimmed.length() > 2000) {
+            throw new IllegalArgumentException("db_query 语句过长（上限 2000 字符）");
+        }
+        List<Map<String, Object>> rows = roJdbc.queryForList(trimmed);
         log.info("db_query: {} rows returned", rows.size());
         return rows;
     }
