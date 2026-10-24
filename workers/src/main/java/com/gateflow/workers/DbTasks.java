@@ -45,6 +45,10 @@ public class DbTasks {
         cfg.setMaximumPoolSize(4);
         cfg.setPoolName("gateflow-ro");
         cfg.setConnectionTimeout(5_000);
+        // 带配置的 HikariDataSource 构造器默认立刻建池并尝试首次连接——CI 和单测环境没有 MySQL，
+        // 构造即炸（本地有 MySQL 所以此前全绿，CI 红）；-1 表示启动时跳过首次连接，连接推迟到真正查询。
+        // 生产语义也更合理：MySQL 短暂不可达时应用照常启动，而不是 bean 创建失败连带整个进程起不来
+        cfg.setInitializationFailTimeout(-1);
         this.roJdbc = new JdbcTemplate(new com.zaxxer.hikari.HikariDataSource(cfg));
         this.draftMapper = draftMapper;
     }
